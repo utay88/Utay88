@@ -1,185 +1,105 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Canlı Yayın (Optimize Edilmiş)</title>
+<meta charset="UTF-8">
+<title>TV Player</title>
+
+<!-- CLAPPR -->
+<script src="https://cdn.jsdelivr.net/npm/@clappr/player@latest/dist/clappr.min.js"></script>
+
+<!-- QUALITY PLUGIN -->
+<script src="https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
 
 <style>
-    /* Styling değişmedi, sadece yorumlar eklendi */
-    body { margin:0; background:black; overflow:hidden; }
-    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
-    video { width:100%; height:100%; object-fit:contain; background:black; }
-
-    /* Kontrol çubuğu */
-    #controls {
-        position:absolute; bottom:0; left:0;
-        width:100%; height:55px;
-        background:rgba(0,0,0,0.55);
-        display:flex; align-items:center;
-        padding:0 12px;
-        opacity:0; transition:opacity .3s;
-        box-sizing: border-box;
-    }
-
-    /* Canlı yayın etiketi */
-    #liveTag {
-        color:white; font-size:15px; display:flex; align-items:center;
-        margin-right:10px; flex-shrink:0;
-    }
-    #liveTag::before {
-        content:""; width:10px; height:10px; background:red;
-        border-radius:50%; margin-right:6px; display:inline-block;
-    }
-
-    /* Seek Bar (Oynatma çubuğu) - Canlı yayın için genellikle GEREKSİZDİR/GİZLENMELİDİR. */
-    #progress { flex:1; margin:0 12px; min-width:0; }
-    #progress input { width:100%; display:block; }
-
-    #volumeBtn, #fsBtn {
-        font-size:28px; color:white; margin-left:10px;
-        cursor:pointer; flex-shrink:0;
-    }
+html,body{
+    margin:0;
+    padding:0;
+    width:100%;
+    height:100%;
+    background:#000;
+    overflow:hidden;
+}
+#player{
+    width:100vw;
+    height:100vh;
+    position:fixed;
+    top:0;left:0;
+}
 </style>
 </head>
 
 <body>
-
-<div id="videoContainer">
-    <video id="player" autoplay playsinline></video>
-
-    <div id="controls">
-        <div id="liveTag">CANLI</div>
-
-        <div id="progress">
-            <input type="range" id="seek" min="0" max="100" value="0" disabled> </div>
-
-        <div id="volumeBtn">🔊</div>
-        <div id="fsBtn">⛶</div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<div id="player"></div>
 
 <script>
-const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+// ===============================
+// JSON URL — BUNU DEĞİŞTİRECEKSİN
+// ===============================
+const jsonURL = "https://seningithubadın/raw/main/channel.json";
 
-let video = document.getElementById("player");
-let controls = document.getElementById("controls");
-let seek = document.getElementById("seek");
-let hideTimer;
-let hls;
-let currentStream = "";
+let currentSrc = "";
+let player = null;
 
-/* -------------------------
-   ALT BAR OTOMATİK GİZLENME
---------------------------*/
-function showControls() {
-    controls.style.opacity = 1;
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-        controls.style.opacity = 0;
-    }, 3000);
-}
-document.body.addEventListener("mousemove", showControls);
-document.body.addEventListener("click", showControls);
+// GERÇEK ÇÖZÜNÜRLÜK OKUMA
+function trueLabel(level){
+    if (level && level.height) return level.height + "p";
 
-/* -------------------------
-   YAYINI YÜKLE - DÜŞÜK GECİKME (LOW-LATENCY) İÇİN OPTİMİZE EDİLDİ
---------------------------*/
-function loadStream(url) {
-    if (hls) hls.destroy();
-    video.src = "";
+    // fallback (Clappr index modeli)
+    const map = {
+        0:"360p",
+        1:"480p",
+        2:"720p",
+        3:"1080p",
+        4:"1440p",
+        5:"2160p"
+    };
 
-    if (Hls.isSupported()) {
-        hls = new Hls({
-            // ⭐ Gecikmeyi (Latency) azaltmak için kritik ayarlar:
-            maxBufferLength: 5,         // Maksimum arabelleği 5 saniye ile sınırla. Daha düşük gecikme için kritik.
-            liveSyncDuration: 1.5,      // Canlı yayında senkronizasyonu 1.5 saniyeye ayarla (Daha yakın başlama).
-            liveDurationInfinity: true, // Canlı yayın için oynatma süresini sonsuz olarak işaretle.
-            // maxMaxBufferLength: 20 // Kullanımı önerilmez, maxBufferLength daha çok kontrol sağlar.
-
-            // HLS.js'in daha hızlı başlatılmasını sağlamak için denenebilecek bir ayar:
-            // enableWorker: false
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(video);
-
-        /* EN YÜKSEK KALİTEYE SABİTLEME MANTIĞI */
-        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-            if (data.levels && data.levels.length > 0) {
-                let highest = data.levels.length - 1;
-                hls.startLevel = highest;   // Başlangıç seviyesini en yükseğe ayarla
-                // hls.currentLevel = highest; // Kaliteyi kilitleme yorum satırına alındı. Adaptif akışa izin vererek takılmayı azaltır.
-            }
-            video.play();
-        });
-
-        /* Kalite değişmeye çalışırsa tekrar en yükseğe çek (Canlı yayınlarda adaptif akış daha iyidir, bu kısım KALDIRILDI) */
-        /* hls.on(Hls.Events.LEVEL_SWITCHING, function () {
-            hls.nextLevel = hls.levels.length - 1;
-        }); */
-
-    } else {
-        // HLS desteklenmiyorsa tarayıcıya bırak
-        video.src = url;
-        video.play();
+    if (level && typeof level.index !== "undefined") {
+        return map[level.index] || "Otomatik";
     }
+
+    return "Otomatik";
 }
 
-/* -------------------------
-   JSON TAKİP
---------------------------*/
-function checkStream() {
-    fetch(kontrolURL + "?t=" + Date.now())
-        .then(r => r.json())
-        .then(d => {
-            if (d.yayin && d.yayin !== currentStream) {
-                console.log("Yeni yayın bulundu: " + d.yayin);
-                currentStream = d.yayin;
-                loadStream(currentStream);
-            }
-        })
-        .catch(e => {
-            console.error("Yayın kontrol hatası:", e);
-        });
+function startPlayer(src){
+    if(player){ player.destroy(); }
+
+    player = new Clappr.Player({
+        source: src,
+        parentId: "#player",
+        autoPlay: true,
+        width: "100%",
+        height: "100%",
+        fullscreenEnabled: true,
+
+        plugins: [LevelSelector],
+        levelSelectorConfig: {
+            title: "Çözünürlük",
+            labelCallback: trueLabel
+        },
+
+        playback: {
+            playInline: true,
+            autoplay: true
+        }
+    });
 }
-setInterval(checkStream, 3000);
-checkStream();
 
-/* -------------------------
-   SEEK BAR - CANLI YAYIN İÇİN DEVRE DIŞI BIRAKILDI
---------------------------*/
-// Canlı yayınlarda seek bar kullanmak gecikme ve takılmaya sebep olabilir.
-// HTML'de 'disabled' eklendi ve JS mantığı KALDIRILDI.
-video.addEventListener("timeupdate", () => {
-    // Sadece kontrol çubuğunun en sonda görünmesi için değer 100 olarak ayarlandı
-    seek.value = 100;
-});
-seek.addEventListener("input", () => {
-    // Kullanıcının seek bar'ı hareket ettirmesi engellendi
-});
+// JSON’dan sürekli kontrol (kanal değişince otomatik geçiş)
+function loadJSON(){
+    fetch(jsonURL)
+    .then(r => r.json())
+    .then(j => {
+        if(j.channel && j.channel !== currentSrc){
+            currentSrc = j.channel;
+            startPlayer(currentSrc);
+        }
+    });
+}
 
-/* -------------------------
-   SES
---------------------------*/
-document.getElementById("volumeBtn").onclick = () => {
-    video.muted = !video.muted;
-};
+loadJSON();
+setInterval(loadJSON, 3000); // 3 sn’de bir yayın kontrolü
 
-/* -------------------------
-   TAM EKRAN
---------------------------*/
-document.getElementById("fsBtn").onclick = () => {
-    // Tarayıcıya özel ön ekler (webkit, moz vb.) eksik, sadece modern tarayıcılar için tam ekran desteği var
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
-};
 </script>
-
 </body>
 </html>
