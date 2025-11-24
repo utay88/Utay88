@@ -18,50 +18,74 @@ body {margin:0;padding:0;background:#000;overflow:hidden;}
 <div id="player"></div>
 
 <script>
-/* ================================
-   JSON’dan yayın çeken TV Player
-================================ */
 
 const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
-/* Çözünürlük LABEL DÜZELTME */
-function fixedQualityLabel(level, label) {
+
+/* Çözünürlük düzeltici */
+function fixedQualityLabel(level) {
     if (level && level.height) return level.height + "p";
 
-    const map = {0:"360p",1:"480p",2:"720p",3:"1080p",4:"1440p"};
-    if (typeof level?.index !== "undefined") return map[level.index] || "Otomatik";
-
-    if (typeof level === "number") return map[level] || "Otomatik";
-
-    return "Otomatik";
+    const index = level?.index ?? 0;
+    const map = {
+        0: "360p",
+        1: "480p",
+        2: "720p",
+        3: "1080p",
+        4: "1440p"
+    };
+    return map[index] || "Otomatik";
 }
 
-/* JSON’u OKU, PLAYER’I BAŞLAT */
-fetch(jsonURL)
-    .then(r => r.json())
-    .then(data => {
-        new Clappr.Player({
-            source: data.channel,
-            parentId: "#player",
-            autoPlay: true,
-            mute: false,
-            height: "100%",
-            width: "100%",
-            plugins: [LevelSelector],
-            levelSelectorConfig: {
-                title: "Çözünürlük",
-                labelCallback: fixedQualityLabel
-            },
-            playback: {
-                autoplay: true,
-                playInline: true
+
+let player;
+
+
+/* Player başlatma */
+function startPlayer(source) {
+    player = new Clappr.Player({
+        source: source,
+        parentId: "#player",
+        autoPlay: true,
+        mute: true,               // AUTOPLAY İÇİN GEREKLİ
+        height: "100%",
+        width: "100%",
+        plugins: [LevelSelector],
+        levelSelectorConfig: {
+            title: "Çözünürlük",
+            labelCallback: fixedQualityLabel
+        },
+        playback: {
+            autoplay: true,
+            playInline: true
+        }
+    });
+
+    // 1 saniye sonra sesi aç
+    setTimeout(() => player.setVolume(100), 1200);
+}
+
+
+/* JSON'u oku ve yayını güncelle */
+function loadStream() {
+    fetch(jsonURL + "?t=" + Date.now())   // CACHE KAPALI
+        .then(r => r.json())
+        .then(data => {
+            if (!player) {
+                startPlayer(data.channel);
+            } else {
+                // Yayın değiştiyse hemen güncelle
+                player.configure({ source: data.channel });
             }
         });
-    })
-    .catch(err => {
-        document.body.innerHTML = "<h2 style='color:white;text-align:center;margin-top:40vh;'>Yayın yüklenemedi</h2>";
-        console.error(err);
-    });
+}
+
+/* İlk yükleme */
+loadStream();
+
+/* Her 5 saniyede bir yayın değişti mi kontrol et */
+setInterval(loadStream, 5000);
+
 </script>
 
 </body>
