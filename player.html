@@ -83,7 +83,6 @@ document.body.addEventListener("click", showControls);
 
 /* -------------------------
    YAYINI YÜKLE
-   HLS Buffer ve Başlangıç Hızı İyileştirmeleri Yapıldı
 --------------------------*/
 function loadStream(url) {
     if (hls) hls.destroy();
@@ -91,13 +90,7 @@ function loadStream(url) {
 
     if (Hls.isSupported()) {
         hls = new Hls({
-            // Daha hızlı yükleme ve daha az gecikme için buffer değerleri optimize edildi.
-            // maxMaxBufferLength: Maksimum buffer süresini düşürür (varsayılan 30s'den 5s'ye).
-            maxMaxBufferLength: 5,
-            // maxBufferLength: Başlangıç buffer'ını daha kısa tutar.
-            maxBufferLength: 2,
-            // startPosition: Canlı yayınlarda oynatmayı en yakın canlı noktadan başlatır.
-            startPosition: -1
+            maxMaxBufferLength:3   // SADECE BURASI 20 → 3 YAPILDI
         });
 
         hls.loadSource(url);
@@ -107,9 +100,8 @@ function loadStream(url) {
         hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
             if (data.levels && data.levels.length > 0) {
                 let highest = data.levels.length - 1;
-                hls.currentLevel = highest;   // kaliteyi kilitle
+                hls.currentLevel = highest;
             }
-            // Yüksek buffer süresi beklemeden hemen oynamaya başlar.
             video.play();
         });
 
