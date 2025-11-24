@@ -1,98 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-    body, html {
-        margin: 0;
-        padding: 0;
-        background: black;
-        height: 100%;
-        overflow: hidden;
-    }
-
-    video {
-        width: 100vw;
-        height: 100vh;
-        background: black;
-    }
-</style>
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12"></script>
-
-</head>
-<body>
-
-<video id="player" controls autoplay playsinline></video>
-
+<meta charset="UTF-8">
+<title>Redirecting...</title>
 <script>
-    const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
+async function load() {
+    try {
+        const res = await fetch("https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json?t=" + Date.now());
+        const data = await res.json();
+        const url = data.channel;
 
-    let video = document.getElementById("player");
-    let hls = null;
-    let lastURL = "";
-
-    function loadStream(url) {
-        if (!url) return;
-
-        // Eski HLS'i kapat
-        if (hls) {
-            hls.destroy();
-            hls = null;
+        if (url) {
+            window.location.href = url; // TELEFONUN KENDİ PLAYERINI AÇAR
+        } else {
+            document.body.innerHTML = "Hata: JSON içinde channel bulunamadı.";
         }
-
-        // HLS başlat
-        hls = new Hls({
-            maxBufferLength: 10,
-            liveSyncDuration: 3,
-            liveMaxLatencyDuration: 5
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(video);
-
-        // Manifest geldiğinde play et
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            // En yüksek kalite
-            let best = 0;
-            hls.levels.forEach((lv, i) => {
-                if (lv.height > hls.levels[best].height) best = i;
-            });
-            hls.currentLevel = best;
-
-            video.play().catch(()=>{});
-        });
-
-        hls.on(Hls.Events.ERROR, (evt, data) => {
-            console.log("HLS HATA:", data);
-        });
+    } catch (e) {
+        document.body.innerHTML = "JSON okunamadı: " + e;
     }
-
-    async function checkJSON() {
-        try {
-            const res = await fetch(jsonURL + "?t=" + Date.now(), {cache: "no-store"});
-            const data = await res.json();
-            const newURL = data.channel.trim();
-
-            // JSON linki değiştiyse stream değiştir
-            if (newURL !== lastURL) {
-                lastURL = newURL;
-                loadStream(newURL);
-            }
-
-        } catch (e) {
-            console.log("JSON hatası:", e);
-        }
-    }
-
-    // İlk çalıştırma
-    checkJSON();
-
-    // 2 saniyede bir kontrol – en uyumlu hız
-    setInterval(checkJSON, 2000);
-
+}
 </script>
-
+</head>
+<body onload="load()">
+Redirecting...
 </body>
 </html>
