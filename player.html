@@ -19,7 +19,7 @@
     }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12"></script>
 
 </head>
 <body>
@@ -36,54 +36,46 @@
     function loadStream(url) {
         if (!url) return;
 
-        // Videoyu durdur
-        video.pause();
-        video.src = "";
-        
-        // Eski HLS nesnesini yok et
+        // Eski HLS'i kapat
         if (hls) {
-            hls.stopLoad();
             hls.destroy();
             hls = null;
         }
 
-        // Yeni HLS nesnesi oluştur
+        // HLS başlat
         hls = new Hls({
-            maxBufferLength: 1,
-            maxMaxBufferLength: 1,
-            backBufferLength: 0,
-            lowLatencyMode: true,
-            liveSyncDuration: 1,
-            liveMaxLatencyDuration: 2,
+            maxBufferLength: 10,
+            liveSyncDuration: 3,
+            liveMaxLatencyDuration: 5
         });
 
         hls.loadSource(url);
         hls.attachMedia(video);
 
+        // Manifest geldiğinde play et
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            // EN YÜKSEK KALİTE
-            let highest = 0;
-            hls.levels.forEach((lvl, i) => {
-                if (lvl.height > hls.levels[highest].height) highest = i;
+            // En yüksek kalite
+            let best = 0;
+            hls.levels.forEach((lv, i) => {
+                if (lv.height > hls.levels[best].height) best = i;
             });
-            hls.currentLevel = highest;
+            hls.currentLevel = best;
 
             video.play().catch(()=>{});
+        });
+
+        hls.on(Hls.Events.ERROR, (evt, data) => {
+            console.log("HLS HATA:", data);
         });
     }
 
     async function checkJSON() {
         try {
-            const response = await fetch(jsonURL + "?_=" + Date.now(), {
-                cache: "no-store"
-            });
-            const data = await response.json();
+            const res = await fetch(jsonURL + "?t=" + Date.now(), {cache: "no-store"});
+            const data = await res.json();
+            const newURL = data.channel.trim();
 
-            let newURL = (data.channel || "").trim();
-
-            // Link aynı görünse bile yenileyelim diye sonuna timestamp ekliyoruz
-            newURL = newURL + "?ts=" + Date.now();
-
+            // JSON linki değiştiyse stream değiştir
             if (newURL !== lastURL) {
                 lastURL = newURL;
                 loadStream(newURL);
@@ -94,11 +86,12 @@
         }
     }
 
-    // ILK ÇALIŞTIRMA
+    // İlk çalıştırma
     checkJSON();
 
-    // HER 1 SANİYEDE BİR KONTROL (en hızlı)
-    setInterval(checkJSON, 1000);
+    // 2 saniyede bir kontrol – en uyumlu hız
+    setInterval(checkJSON, 2000);
+
 </script>
 
 </body>
