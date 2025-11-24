@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canlı Yayın</title>
 
 <style>
-body { margin:0; background:black; overflow:hidden; }
+body {
+  margin:0;
+  background:black;
+  overflow:hidden;
+}
 
 #videoContainer {
   position:fixed;
   top:0; left:0;
   width:100%;
   height:100%;
-  background:black;
 }
 
 #player {
@@ -28,33 +31,37 @@ body { margin:0; background:black; overflow:hidden; }
   bottom:0;
   left:0;
   width:100%;
-  padding:8px 12px;
+  padding:10px;
   display:flex;
   align-items:center;
-  gap:10px;
-  background:rgba(0,0,0,0.40);
+  justify-content:space-between;
+  background:rgba(0,0,0,0.35);
   transition:opacity .4s;
   opacity:0;
 }
 
-#controls.show {
-  opacity:1;
+#controls.show { opacity:1; }
+
+.liveGroup {
+  display:flex;
+  align-items:center;
+  gap:6px;
 }
 
 .liveDot {
-  width:10px; height:10px;
-  border-radius:50%;
+  width:10px;
+  height:10px;
   background:red;
+  border-radius:50%;
 }
 
 .liveText {
   color:white;
   font-size:16px;
-  font-weight:bold;
 }
 
 #progress {
-  flex:0 0 75%;
+  width:70%;      /* SADECE BUNU DÜŞÜRDÜM – TAŞMA YOK */
 }
 
 #progress input {
@@ -62,11 +69,12 @@ body { margin:0; background:black; overflow:hidden; }
 }
 
 .ctrlBtn {
-  color:white;
   font-size:26px;
-  cursor:pointer;
+  color:white;
   padding:4px;
+  cursor:pointer;
 }
+
 </style>
 </head>
 
@@ -77,11 +85,13 @@ body { margin:0; background:black; overflow:hidden; }
   <video id="player" playsinline></video>
 
   <div id="controls">
-      <div class="liveDot"></div>
-      <div class="liveText">LIVE</div>
+      <div class="liveGroup">
+        <div class="liveDot"></div>
+        <div class="liveText">LIVE</div>
+      </div>
 
       <div id="progress">
-          <input type="range" id="seek" min="0" max="100" value="0">
+        <input type="range" id="seek" min="0" max="100" value="0">
       </div>
 
       <div id="muteBtn" class="ctrlBtn">🔊</div>
@@ -93,8 +103,6 @@ body { margin:0; background:black; overflow:hidden; }
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
-
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
 let seek = document.getElementById("seek");
@@ -103,77 +111,58 @@ let muteBtn = document.getElementById("muteBtn");
 
 let hls;
 let hideTimer;
-let currentStream = "";
 
-/* --- JSON YAYIN KONTROLÜ --- */
-function checkStream() {
-    fetch(kontrolURL + "?t=" + Date.now())
-    .then(r=>r.json())
-    .then(data=>{
-        if(data.yayin && data.yayin !== currentStream){
-            currentStream = data.yayin;
-            loadStream(currentStream);
-        }
-    });
-}
-
-setInterval(checkStream, 2000);
-checkStream();
-
-/* --- STREAM YÜKLEME --- */
+/* --- STREAM YÜKLEME (Senin çalışan model) --- */
 function loadStream(url){
-  if(hls){ hls.destroy(); hls=null; }
+    if(hls){ hls.destroy(); hls=null; }
 
-  if(Hls.isSupported()){
-      hls = new Hls({
-          maxMaxBufferLength:60,
-          liveSyncDuration:4,
-          liveDurationInfinity:true
-      });
-
-      hls.loadSource(url);
-      hls.attachMedia(video);
-
-  } else {
-      video.src = url;
-  }
-
-  video.play();
+    if(Hls.isSupported()){
+        hls = new Hls({
+            maxMaxBufferLength:60,
+            liveSyncDuration:4
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+    } else {
+        video.src = url;
+    }
+    video.play();
 }
 
-/* --- KONTROLLERİ OTOMATİK SAKLA --- */
+/* MANUEL TEST İÇİN → Buraya yayınını yazabilirsin */
+loadStream("https://tv-trtspor1.medya.trt.com.tr/master.m3u8");
+
+/* BAR GİZLEME */
 function showControls(){
   controls.classList.add("show");
   clearTimeout(hideTimer);
-  hideTimer = setTimeout(()=>controls.classList.remove("show"), 3000);
+  hideTimer = setTimeout(()=>controls.classList.remove("show"), 2500);
 }
-
-document.addEventListener("mousemove", showControls);
 document.addEventListener("touchstart", showControls);
+document.addEventListener("mousemove", showControls);
 
-/* --- SEEKBAR --- */
-video.addEventListener("timeupdate",()=>{
-    if(!video.duration) return;
-    seek.value = (video.currentTime / video.duration) * 100;
+/* SEEKBAR */
+video.addEventListener("timeupdate", ()=>{
+    if(video.duration)
+      seek.value = (video.currentTime / video.duration) * 100;
 });
 
-seek.addEventListener("input",()=>{
+seek.oninput = ()=>{
     video.currentTime = (seek.value / 100) * video.duration;
-});
+};
 
-/* --- SES --- */
+/* SES */
 muteBtn.onclick = ()=>{
   video.muted = !video.muted;
   muteBtn.textContent = video.muted ? "🔇" : "🔊";
 };
 
-/* --- TAM EKRAN --- */
+/* TAM EKRAN */
 fsBtn.onclick = ()=>{
-  if(!document.fullscreenElement){
-      video.requestFullscreen();
-  } else {
-      document.exitFullscreen();
-  }
+  if(!document.fullscreenElement)
+    video.requestFullscreen();
+  else
+    document.exitFullscreen();
 };
 </script>
 
