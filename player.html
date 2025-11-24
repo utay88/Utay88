@@ -1,44 +1,62 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canlı Yayın</title>
 
 <style>
-    body { margin:0; background:black; overflow:hidden; }
-    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
-    video { width:100%; height:100%; object-fit:contain; background:black; }
+body { margin:0; background:black; overflow:hidden; }
+#videoContainer { width:100vw; height:100vh; position:relative; background:black; }
+video { width:100%; height:100%; object-fit:contain; background:black; }
 
-    #controls {
-        position:absolute; bottom:0; left:0;
-        width:100%; height:55px;
-        background:rgba(0,0,0,0.55);
-        display:flex; align-items:center;
-        padding:0 12px;
-        opacity:0; transition:opacity .3s;
-        box-sizing: border-box;
-    }
+#controls {
+    position:absolute; bottom:0; left:0;
+    width:100%; height:55px;
+    background:rgba(0,0,0,0.55);
+    display:flex; align-items:center;
+    padding:0 12px;
+    opacity:0; transition:opacity .3s;
+    box-sizing:border-box;
+}
 
-    #liveTag {
-        color:white; font-size:15px; display:flex; align-items:center;
-        margin-right:10px; flex-shrink:0;
-    }
-    #liveTag::before {
-        content:""; width:10px; height:10px; background:red;
-        border-radius:50%; margin-right:6px; display:inline-block;
-    }
+#liveTag {
+    color:white; font-size:15px; display:flex; align-items:center;
+    margin-right:10px; flex-shrink:0;
+}
+#liveTag::before {
+    content:""; width:10px; height:10px; background:red;
+    border-radius:50%; margin-right:6px; display:inline-block;
+}
 
-    #progress { flex:1; margin:0 12px; min-width:0; }
-    #progress input { width:100%; display:block; }
+#progress { flex:1; margin:0 12px; min-width:0; }
+#progress input { width:100%; display:block }
 
-    #volumeBtn, #fsBtn {
-        font-size:28px; color:white; margin-left:10px;
-        cursor:pointer; flex-shrink:0;
-    }
+#volumeBtn, #fsBtn, #qualityBtn {
+    font-size:22px; color:white;
+    margin-left:10px;
+    cursor:pointer; flex-shrink:0;
+    font-weight:bold;
+}
+
+#qualityMenu {
+    position:absolute;
+    bottom:60px;
+    right:20px;
+    background:rgba(0,0,0,0.85);
+    padding:8px 12px;
+    border-radius:6px;
+    display:none;
+}
+.qItem {
+    color:white;
+    padding:6px 0;
+    cursor:pointer;
+    font-size:16px;
+}
+.qItem:hover { opacity:0.6; }
 </style>
 </head>
-
 <body>
 
 <div id="videoContainer">
@@ -48,29 +66,44 @@
         <div id="liveTag">LIVE</div>
 
         <div id="progress">
-            <input type="range" id="seek" min="0" max="100" value="0">
+            <input type="range" id="seek" min="0" max="100">
         </div>
 
+        <div id="qualityBtn">HD</div>
         <div id="volumeBtn">🔊</div>
         <div id="fsBtn">⛶</div>
+    </div>
+
+    <div id="qualityMenu">
+        <div class="qItem" data-q="360">360p</div>
+        <div class="qItem" data-q="480">480p</div>
+        <div class="qItem" data-q="720">720p</div>
+        <div class="qItem" data-q="1080">1080p</div>
+        <div class="qItem" data-q="1440">1440p</div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+/* ================================================
+   ✔ KANAL ADI — HER HTML SAYFASINDA BUNU DEĞİŞTİR!
+================================================ */
+const kanalAdi = "trtspor";  // Örnek — her sayfada kendine göre değiştir
 
+/* ================================================ */
+const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
+let qualityMenu = document.getElementById("qualityMenu");
 let seek = document.getElementById("seek");
 let hideTimer;
 let hls;
 let currentStream = "";
 
-/* -------------------------
-   ALT BAR OTOMATİK GİZLENME
---------------------------*/
+/* ================================================
+   ✔ ALT BAR OTOMATİK GİZLENME
+================================================ */
 function showControls() {
     controls.style.opacity = 1;
     clearTimeout(hideTimer);
@@ -81,9 +114,9 @@ function showControls() {
 document.body.addEventListener("mousemove", showControls);
 document.body.addEventListener("click", showControls);
 
-/* -------------------------
-   YAYINI YÜKLE
---------------------------*/
+/* ================================================
+   ✔ YAYINI YÜKLE
+================================================ */
 function loadStream(url) {
     if (hls) hls.destroy();
     video.src = "";
@@ -96,16 +129,14 @@ function loadStream(url) {
         hls.loadSource(url);
         hls.attachMedia(video);
 
-        /* EN YÜKSEK KALİTEYE SABİTLEME */
         hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
             if (data.levels && data.levels.length > 0) {
                 let highest = data.levels.length - 1;
-                hls.currentLevel = highest;   // kaliteyi kilitle
+                hls.currentLevel = highest;
             }
             video.play();
         });
 
-        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
         hls.on(Hls.Events.LEVEL_SWITCHING, function () {
             hls.nextLevel = hls.levels.length - 1;
         });
@@ -116,15 +147,16 @@ function loadStream(url) {
     }
 }
 
-/* -------------------------
-   JSON TAKİP
---------------------------*/
+/* ================================================
+   ✔ JSON'DAN YAYIN TAKİP
+================================================ */
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
         .then(d => {
-            if (d.yayin && d.yayin !== currentStream) {
-                currentStream = d.yayin;
+            let link = d.kanallar[kanalAdi];
+            if (link && link !== currentStream) {
+                currentStream = link;
                 loadStream(currentStream);
             }
         });
@@ -132,9 +164,9 @@ function checkStream() {
 setInterval(checkStream, 3000);
 checkStream();
 
-/* -------------------------
-   SEEK BAR
---------------------------*/
+/* ================================================
+   ✔ SEEK BAR
+================================================ */
 video.addEventListener("timeupdate", () => {
     if (!video.duration) return;
     seek.value = (video.currentTime / video.duration) * 100;
@@ -143,16 +175,16 @@ seek.addEventListener("input", () => {
     video.currentTime = (seek.value / 100) * video.duration;
 });
 
-/* -------------------------
-   SES
---------------------------*/
+/* ================================================
+   ✔ SES BUTONU
+================================================ */
 document.getElementById("volumeBtn").onclick = () => {
     video.muted = !video.muted;
 };
 
-/* -------------------------
-   TAM EKRAN
---------------------------*/
+/* ================================================
+   ✔ TAM EKRAN
+================================================ */
 document.getElementById("fsBtn").onclick = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
@@ -160,6 +192,48 @@ document.getElementById("fsBtn").onclick = () => {
         document.exitFullscreen();
     }
 };
+
+/* ================================================
+   ✔ QUALITY (HD) BUTONU
+================================================ */
+let qualityBtn = document.getElementById("qualityBtn");
+let qualityTimer;
+
+qualityBtn.onclick = () => {
+    qualityMenu.style.display = "block";
+    clearTimeout(qualityTimer);
+    qualityTimer = setTimeout(() => {
+        qualityMenu.style.display = "none";
+    }, 3000);
+};
+
+document.querySelectorAll(".qItem").forEach(item => {
+    item.onclick = () => {
+        let q = item.getAttribute("data-q");
+
+        if (hls && hls.levels) {
+            let index = hls.levels.findIndex(l => l.height == q);
+            if (index !== -1) hls.currentLevel = index;
+        }
+
+        qualityMenu.style.display = "none";
+    };
+});
+
+/* ================================================
+   ✔ ESC / BACK TUŞU TAM GARANTİ
+================================================ */
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" || e.key === "Backspace") {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+            return;
+        }
+        if (history.length > 1) {
+            history.back();
+        }
+    }
+});
 </script>
 
 </body>
