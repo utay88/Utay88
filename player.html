@@ -4,102 +4,65 @@
 <meta charset="UTF-8">
 <title>TV Player</title>
 
-<!-- CLAPPR -->
-<script src="https://cdn.jsdelivr.net/npm/@clappr/player@latest/dist/clappr.min.js"></script>
+<style>
+body {margin:0;padding:0;background:#000;overflow:hidden;}
+#player {width:100vw;height:100vh;position:fixed;top:0;left:0;}
+</style>
 
-<!-- QUALITY PLUGIN -->
+<script src="https://cdn.jsdelivr.net/npm/@clappr/player@latest/dist/clappr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
 
-<style>
-html,body{
-    margin:0;
-    padding:0;
-    width:100%;
-    height:100%;
-    background:#000;
-    overflow:hidden;
-}
-#player{
-    width:100vw;
-    height:100vh;
-    position:fixed;
-    top:0;left:0;
-}
-</style>
 </head>
-
 <body>
+
 <div id="player"></div>
 
 <script>
-// ===============================
-// JSON URL — BUNU DEĞİŞTİRECEKSİN
-// ===============================
-const jsonURL = "https://seningithubadın/raw/main/channel.json";
+/* ================================
+   JSON’dan yayın çeken TV Player
+================================ */
 
-let currentSrc = "";
-let player = null;
+const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
-// GERÇEK ÇÖZÜNÜRLÜK OKUMA
-function trueLabel(level){
+/* Çözünürlük LABEL DÜZELTME */
+function fixedQualityLabel(level, label) {
     if (level && level.height) return level.height + "p";
 
-    // fallback (Clappr index modeli)
-    const map = {
-        0:"360p",
-        1:"480p",
-        2:"720p",
-        3:"1080p",
-        4:"1440p",
-        5:"2160p"
-    };
+    const map = {0:"360p",1:"480p",2:"720p",3:"1080p",4:"1440p"};
+    if (typeof level?.index !== "undefined") return map[level.index] || "Otomatik";
 
-    if (level && typeof level.index !== "undefined") {
-        return map[level.index] || "Otomatik";
-    }
+    if (typeof level === "number") return map[level] || "Otomatik";
 
     return "Otomatik";
 }
 
-function startPlayer(src){
-    if(player){ player.destroy(); }
-
-    player = new Clappr.Player({
-        source: src,
-        parentId: "#player",
-        autoPlay: true,
-        width: "100%",
-        height: "100%",
-        fullscreenEnabled: true,
-
-        plugins: [LevelSelector],
-        levelSelectorConfig: {
-            title: "Çözünürlük",
-            labelCallback: trueLabel
-        },
-
-        playback: {
-            playInline: true,
-            autoplay: true
-        }
-    });
-}
-
-// JSON’dan sürekli kontrol (kanal değişince otomatik geçiş)
-function loadJSON(){
-    fetch(jsonURL)
+/* JSON’u OKU, PLAYER’I BAŞLAT */
+fetch(jsonURL)
     .then(r => r.json())
-    .then(j => {
-        if(j.channel && j.channel !== currentSrc){
-            currentSrc = j.channel;
-            startPlayer(currentSrc);
-        }
+    .then(data => {
+        new Clappr.Player({
+            source: data.channel,
+            parentId: "#player",
+            autoPlay: true,
+            mute: false,
+            height: "100%",
+            width: "100%",
+            plugins: [LevelSelector],
+            levelSelectorConfig: {
+                title: "Çözünürlük",
+                labelCallback: fixedQualityLabel
+            },
+            playback: {
+                autoplay: true,
+                playInline: true
+            }
+        });
+    })
+    .catch(err => {
+        document.body.innerHTML = "<h2 style='color:white;text-align:center;margin-top:40vh;'>Yayın yüklenemedi</h2>";
+        console.error(err);
     });
-}
-
-loadJSON();
-setInterval(loadJSON, 3000); // 3 sn’de bir yayın kontrolü
-
 </script>
+
 </body>
 </html>
