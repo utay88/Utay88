@@ -7,12 +7,14 @@
 
 <style>
     body { margin:0; background:black; overflow:hidden; }
+
     #videoContainer {
         width:100vw;
         height:100vh;
         position:relative;
         background:black;
     }
+
     video {
         width:100%;
         height:100%;
@@ -20,7 +22,7 @@
         background:black;
     }
 
-    /* Alt bar */
+    /* ALT BAR */
     #controls {
         position:absolute;
         bottom:0;
@@ -30,23 +32,22 @@
         background:rgba(0,0,0,0.55);
         display:flex;
         align-items:center;
-        padding:0 12px;
+        padding:0 14px;
         opacity:0;
-        transition:opacity .3s;
-        /* DÜZELTME: Öğeler arasında boşluk bırakmak yerine merkezleme yapalım */
-        box-sizing: border-box; /* padding'i width içine dahil et */
+        transition:opacity .25s;
+        box-sizing: border-box;
     }
 
     /* LIVE */
     #liveTag {
         color:white;
-        font-size:15px;
+        font-size:16px;
         display:flex;
         align-items:center;
-        margin-right:10px;
-        /* DÜZELTME: Bu öğenin boyutunun sabit kalmasını sağlar */
+        margin-right:12px;
         flex-shrink: 0;
     }
+
     #liveTag::before {
         content:"";
         width:10px;
@@ -57,27 +58,34 @@
         display:inline-block;
     }
 
-    /* Progress bar */
+    /* SEEK BAR */
     #progress {
         flex:1;
-        margin:0 12px;
-        /* DÜZELTME: Bu öğenin esnek bir şekilde dolmasını sağlar */
-        min-width: 0;
-    }
-    #progress input {
-        width:100%;
-        /* DÜZELTME: Range input'un dikey olarak ortalanmasına yardımcı olur */
-        display: block;
+        min-width:0;
+        display:flex;
+        align-items:center;
     }
 
-    /* Buttons */
+    #progress input {
+        width:100%;
+        height:6px;
+        display:block;
+        border-radius:4px;
+    }
+
+    /* SES VE FULLSCREEN İKONLARI */
     #volumeBtn, #fsBtn {
         font-size:28px;
         color:white;
-        margin-left:10px;
+        margin-left:14px;
         cursor:pointer;
-        /* DÜZELTME: Bu düğmelerin boyutlarının sabit kalmasını sağlar */
-        flex-shrink: 0;
+        flex-shrink:0;
+        user-select:none;
+    }
+
+    /* Fullscreen ikon taşmasını engelle */
+    #fsBtn {
+        margin-right:2px;
     }
 </style>
 </head>
@@ -95,7 +103,7 @@
         </div>
 
         <div id="volumeBtn">🔊</div>
-        <div id="fsBtn">⛶</div>
+        <div id="fsBtn">⤢</div>
     </div>
 </div>
 
@@ -111,7 +119,7 @@ let hideTimer;
 let hls;
 let currentStream = "";
 
-// BAR GÖSTER / GİZLE
+/* BAR GÖSTER / GİZLE */
 function showControls() {
     controls.style.opacity = 1;
     clearTimeout(hideTimer);
@@ -122,25 +130,23 @@ function showControls() {
 document.body.addEventListener("mousemove", showControls);
 document.body.addEventListener("click", showControls);
 
-// YAYINI YÜKLE
+/* YAYINI YÜKLE */
 function loadStream(url) {
-    if (hls) { hls.destroy(); }
+    if (hls) hls.destroy();
     video.src = "";
 
     if (Hls.isSupported()) {
         hls = new Hls({maxMaxBufferLength:20});
         hls.loadSource(url);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            video.play();
-        });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
     } else {
         video.src = url;
         video.play();
     }
 }
 
-// JSON TAKİP
+/* JSON KONTROL */
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
@@ -154,7 +160,7 @@ function checkStream() {
 setInterval(checkStream, 3000);
 checkStream();
 
-// SEEK BAR
+/* SEEK BAR */
 video.addEventListener("timeupdate", () => {
     if (!video.duration) return;
     seek.value = (video.currentTime / video.duration) * 100;
@@ -164,12 +170,12 @@ seek.addEventListener("input", () => {
     video.currentTime = (seek.value / 100) * video.duration;
 });
 
-// SES
+/* SES */
 document.getElementById("volumeBtn").onclick = () => {
     video.muted = !video.muted;
 };
 
-// FULLSCREEN
+/* FULLSCREEN */
 document.getElementById("fsBtn").onclick = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
