@@ -1,3 +1,5 @@
+</body>
+</html>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -10,17 +12,17 @@
     #videoContainer { width:100vw; height:100vh; position:relative; background:black; display:flex; justify-content:center; align-items:center; }
     video { width:100%; height:100%; object-fit:contain; background:black; }
 
-    /* Alt barı tekrar görünür hale getirme ve düzeltme */
+    /* Alt bar düzeltmeleri */
     #controls {
         position:absolute; bottom:0; left:0;
         width:100%; height:55px;
         background:rgba(0,0,0,0.55);
-        display:flex; align-items:center; /* Öğeleri dikeyde ortala */
+        display:flex; align-items:center;
         padding:0 12px;
-        opacity:1; /* Başlangıçta görünür olsun */
+        opacity:0; /* Başlangıçta gizli olsun, fare hareketiyle ortaya çıksın */
         transition:opacity .3s;
-        box-sizing: border-box; /* Padding ve border kutu boyutuna dahil edilsin */
-        user-select: none; /* Metin seçimini engelle */
+        box-sizing: border-box;
+        z-index: 20; /* Kontrol çubuğunu öne çıkar */
     }
 
     #liveTag {
@@ -32,8 +34,7 @@
         border-radius:50%; margin-right:6px; display:inline-block;
     }
 
-    /* Progress bar'ı tekrar görünür hale getirme (isteğe bağlı, canlı yayında genelde olmaz) */
-    #progress { flex:1; margin:0 12px; min-width:0; /*display:none; /* Bu satırı kaldırarak progress barı göster */ }
+    #progress { flex:1; margin:0 12px; min-width:0; }
     #progress input { width:100%; display:block; }
 
     #volumeBtn, #fsBtn {
@@ -41,7 +42,7 @@
         cursor:pointer; flex-shrink:0;
     }
 
-    /* Yayın açılana kadar gösterilecek merkezdeki büyük oynat butonu */
+    /* Oynatma butonu (Play Overlay) */
     #playOverlay {
         position: absolute;
         top: 0; left: 0; right: 0; bottom: 0;
@@ -50,7 +51,7 @@
         justify-content: center;
         align-items: center;
         cursor: pointer;
-        z-index: 10;
+        z-index: 10; /* Kontrol çubuğunun altında kalır */
     }
     #playOverlay.hidden {
         display: none;
@@ -67,8 +68,8 @@
 <body>
 
 <div id="videoContainer">
-    <video id="player" autoplay playsinline></video>
-
+    <video id="player" playsinline></video>
+    
     <div id="playOverlay">
         <svg viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z"/>
@@ -77,11 +78,9 @@
 
     <div id="controls">
         <div id="liveTag">CANLI</div>
-
         <div id="progress">
             <input type="range" id="seek" min="0" max="100" value="0">
         </div>
-
         <div id="volumeBtn">🔊</div>
         <div id="fsBtn">⛶</div>
     </div>
@@ -102,34 +101,36 @@ let hls;
 let currentStream = "";
 
 /* -------------------------
-   ALT BAR OTOMATİK GİZLENME (Şimdi daha yumuşak geçişli)
+   ALT BAR OTOMATİK GİZLENME
 --------------------------*/
 function showControls() {
     controls.style.opacity = 1;
     clearTimeout(hideControlsTimer);
     hideControlsTimer = setTimeout(() => {
-        controls.style.opacity = 0;
+        // Video oynuyorsa gizle
+        if (!video.paused && !video.ended) {
+            controls.style.opacity = 0;
+        }
     }, 3000);
 }
 
-// Fare hareket ettiğinde veya tıklandığında kontrolleri göster
 document.body.addEventListener("mousemove", showControls);
 document.body.addEventListener("click", showControls);
-video.addEventListener("play", showControls); // Video oynadığında da göster
-video.addEventListener("pause", showControls); // Video durduğunda da göster
-
-// Sayfa yüklendiğinde kontrolleri göster ve sonra gizle
-showControls();
+video.addEventListener("play", showControls);
+video.addEventListener("pause", showControls);
 
 /* -------------------------
    YAYINI YÜKLE
 --------------------------*/
 function loadStream(url) {
     if (!url) {
-        console.warn("Yayın URL'si boş. Yayın başlatılamıyor.");
+        console.warn("Yayın URL'si boş.");
+        // URL boşsa oynatma tuşunu göster
+        playOverlay.classList.remove("hidden");
         return;
     }
 
+    // Mevcut hls örneğini temizle
     if (hls) {
         hls.destroy();
         hls = null;
@@ -138,68 +139,45 @@ function loadStream(url) {
 
     if (Hls.isSupported()) {
         hls = new Hls({
-            // Canlı yayın için düşük gecikme ayarları
-            maxMaxBufferLength: 3, // Daha agresif buffer boyutu
+            maxMaxBufferLength: 3,
             liveSyncDurationCount: 3,
             liveMaxLatencyDurationCount: 5,
             enableWorker: true,
-            // CORS sorunlarını hafifletebilecek ayarlar
             crossOrigin: 'anonymous'
         });
 
         hls.loadSource(url);
         hls.attachMedia(video);
 
-        // HLS.js olaylarını izleyerek hata ayıklama
         hls.on(Hls.Events.ERROR, function (event, data) {
-            console.error("HLS.js HATA:", data.type, data.details, data.fatal ? "(Fatal)" : "", data);
+            console.error("HLS.js HATA:", data.details, data);
+            // Hata durumunda oynatma tuşunu göster
+            playOverlay.classList.remove("hidden"); 
+
             if (data.fatal) {
-                switch(data.type) {
-                    case Hls.ErrorTypes.NETWORK_ERROR:
-                        console.error("NETWORK ERROR: Medya verisi yüklenemedi. URL'yi kontrol edin veya CORS hatası olabilir.");
-                        // Yeniden deneme mekanizması eklenebilir
-                        break;
-                    case Hls.ErrorTypes.MEDIA_ERROR:
-                        console.error("MEDIA ERROR: Medya oynatma hatası.");
-                        hls.recoverMediaError();
-                        break;
-                    default:
-                        // Fatal olmayan hatalarda da hls.destroy() ve yeniden yükleme denenebilir
-                        hls.destroy();
-                        setTimeout(() => loadStream(url), 1000); // 1 saniye sonra yeniden dene
-                        break;
+                // Fatal hatalarda yayın yüklemeyi yeniden dene
+                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                     console.error("NETWORK HATA: Tekrar deneniyor...");
                 }
+                hls.destroy();
+                setTimeout(() => loadStream(url), 500);
             }
         });
 
         hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-            console.log("HLS Manifest Parsed:", data);
             if (data.levels && data.levels.length > 0) {
-                // En yüksek kaliteye sabitle
-                let highest = data.levels.length - 1;
-                hls.currentLevel = highest;
-                console.log("Yayın kalitesi en yükseğe ayarlandı:", hls.levels[highest].height || "Bilinmiyor");
+                hls.currentLevel = data.levels.length - 1; // En yüksek kalite
             }
-            tryPlayVideo();
+            tryPlayVideo(); // Manifest yüklendikten sonra oynatmayı dene
         });
 
-        hls.on(Hls.Events.LEVEL_SWITCHING, function (event, data) {
-            // Eğer otomatik kalite değişimi olursa ve en yüksek değilse, tekrar en yükseğe zorla
-            if (hls.levels && data.level !== hls.levels.length - 1) {
-                hls.nextLevel = hls.levels.length - 1;
-            }
-        });
-        hls.on(Hls.Events.BUFFER_APPENDED, function() {
-            // Tampona veri eklendiğinde oynatma butonu gizlensin
-            playOverlay.classList.add("hidden");
-        });
-
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) { // Safari desteği
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari (Yerel HLS)
         video.src = url;
         tryPlayVideo();
     } else {
         console.error("Tarayıcı HLS formatını desteklemiyor.");
-        alert("Üzgünüm, tarayıcınız bu video formatını desteklemiyor.");
+        playOverlay.classList.remove("hidden");
     }
 }
 
@@ -207,18 +185,17 @@ function loadStream(url) {
    VİDEOYU OYNATMA GİRİŞİMİ
 --------------------------*/
 function tryPlayVideo() {
+    // Video elementi zaten oynuyorsa veya bitmişse tekrar deneme
+    if (!video.paused && !video.ended) return;
+
     video.play()
         .then(() => {
             console.log("Video oynatılıyor...");
             playOverlay.classList.add("hidden"); // Başarılıysa oynatma butonu gizlenir
         })
         .catch(e => {
-            console.error("Video oynatılamadı:", e.name, e.message);
-            // Otomatik oynatma engellenmiş olabilir, kullanıcıya bir mesaj gösterilebilir
+            console.error("Video oynatılamadı. Otomatik oynatma engellenmiş olabilir:", e.name, e.message);
             playOverlay.classList.remove("hidden"); // Hata olursa oynatma butonu görünür kalır
-            if (e.name === "NotAllowedError") {
-                console.warn("Tarayıcı otomatik oynatmayı engelledi. Lütfen oynat butonuna tıklayın.");
-            }
         });
 }
 
@@ -226,12 +203,14 @@ function tryPlayVideo() {
    JSON TAKİP VE YENİ YAYIN YÜKLEME
 --------------------------*/
 function checkStream() {
-    // Cache'i önlemek için sorgu parametresi eklendi
+    // Kontrole başlamadan önce oynatma tuşunu göster, yeni yayın gelirse tıklanabilir olmalı.
+    if (video.paused || video.ended || video.readyState < 3) {
+        playOverlay.classList.remove("hidden");
+    }
+
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => {
-            if (!r.ok) {
-                throw new Error(`HTTP hata kodu: ${r.status}`);
-            }
+            if (!r.ok) throw new Error(`HTTP hata kodu: ${r.status}`);
             return r.json();
         })
         .then(d => {
@@ -245,28 +224,39 @@ function checkStream() {
         })
         .catch(e => {
             console.error("Yayın kontrol hatası:", e);
-            // Hata durumunda da oynatma butonunu göster
             playOverlay.classList.remove("hidden");
         });
 }
-// Kontrol aralığı kısaltıldı
 setInterval(checkStream, CHECK_INTERVAL);
-checkStream(); // Sayfa yüklenir yüklenmez ilk kontrolü yap
+checkStream(); 
 
 /* -------------------------
-   MERKEZ OYNAT BUTONU TIKLAMASI
+   MERKEZ OYNAT BUTONU TIKLAMASI - KRİTİK DÜZELTME
 --------------------------*/
 playOverlay.addEventListener("click", () => {
-    tryPlayVideo();
+    // Oynatma tuşuna tıklandığında hem videoyu oynatmayı dene hem de HLS'i yeniden yüklemeyi dene.
+    // Bu, ağ hatası veya manifest hatası durumunda kullanıcı etkileşimi ile yayının yeniden başlatılmasını sağlar.
+    if (currentStream) {
+        // Yükleme sırasında hata oluştuysa diye tekrar yükle
+        if (!hls || !hls.media) {
+             loadStream(currentStream);
+        }
+        tryPlayVideo();
+    } else {
+        // Henüz yayın URL'si gelmediyse, tekrar kontrol et.
+        checkStream(); 
+        console.log("Yayın URL'si bekleniyor...");
+    }
 });
 
 /* -------------------------
-   SEEK BAR (Canlı yayında genellikle gereksizdir ancak alt bar düzeltildiği için bırakıldı)
+   DİĞER KONTROLLER
 --------------------------*/
 video.addEventListener("timeupdate", () => {
+    // Canlı yayında seek bar'ı sıfırla ve etkisizleştir
     if (!video.duration || video.duration === Infinity || isNaN(video.duration)) {
-        seek.value = 0; // Canlı yayın için sıfırda tut
-        seek.disabled = true; // Seek bar'ı etkisizleştir
+        seek.value = 0;
+        seek.disabled = true;
         return;
     }
     seek.disabled = false;
@@ -278,28 +268,21 @@ seek.addEventListener("input", () => {
     }
 });
 
-/* -------------------------
-   SES
---------------------------*/
 document.getElementById("volumeBtn").onclick = () => {
     video.muted = !video.muted;
     document.getElementById("volumeBtn").textContent = video.muted ? "🔇" : "🔊";
 };
 
-/* -------------------------
-   TAM EKRAN
---------------------------*/
 document.getElementById("fsBtn").onclick = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
-        document.getElementById("fsBtn").textContent = "🗖"; // Tam ekrandan çıkma ikonu
+        document.getElementById("fsBtn").textContent = "🗖";
     } else {
         document.exitFullscreen();
-        document.getElementById("fsBtn").textContent = "⛶"; // Tam ekran ikonu
+        document.getElementById("fsBtn").textContent = "⛶";
     }
 };
 
-// Video meta verileri yüklendiğinde varsayılan sesi %50 olarak ayarla
 video.addEventListener('loadedmetadata', function() {
     video.volume = 0.5;
 });
