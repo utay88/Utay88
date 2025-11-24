@@ -9,7 +9,7 @@
     <style>
         body { margin: 0; background: black; }
         #my-video { width: 100%; height: 100vh; }
-        .vjs-menu li { font-size: 18px; }
+        .vjs-quality-menu li { font-size: 18px !important; }
     </style>
 </head>
 
@@ -40,13 +40,14 @@ function checkStream() {
 
 function loadStream(url) {
     if (Hls.isSupported()) {
+
         const hls = new Hls({ enableWorker: true });
 
         hls.loadSource(url);
         hls.attachMedia(player.tech().el_);
 
         hls.on(Hls.Events.MANIFEST_PARSED, function (_, data) {
-            addQualityMenu(hls, data.levels);
+            createQualityMenu(hls, data.levels);
             player.play();
         });
 
@@ -56,32 +57,40 @@ function loadStream(url) {
     }
 }
 
-function addQualityMenu(hls, levels) {
-    if (!player.controlBar.getChild('QualitySelector')) {
-        let menu = player.controlBar.addChild('menu-button', {}, 0);
-        menu.addClass("vjs-icon-cog");
-        menu.addClass("vjs-quality-selector");
+function createQualityMenu(hls, levels) {
+    if (player.controlBar.getChild("QualitySelector")) return;
 
-        let qMenu = menu.createMenu();
+    let Button = videojs.getComponent("MenuButton");
+    let MenuItem = videojs.getComponent("MenuItem");
 
-        levels.forEach((level, index) => {
-            let label = (level.height ? level.height + "p" : "Otomatik");
+    class QualitySelector extends Button {
+        createMenu() {
+            const menu = new videojs.getComponent("Menu")(player);
 
-            let item = new videojs.getComponent('MenuItem')(player, {
-                label: label,
-                selectable: true,
-                selected: index === hls.currentLevel
+            levels.forEach((level, index) => {
+                let label = level.height ? level.height + "p" : "Otomatik";
+
+                let item = new MenuItem(player, {
+                    label: label,
+                    selectable: true,
+                    selected: index === hls.currentLevel
+                });
+
+                item.on("click", () => {
+                    hls.currentLevel = index;
+                });
+
+                menu.addChild(item);
             });
 
-            item.on('click', () => {
-                hls.currentLevel = index;
-            });
-
-            qMenu.addChild(item);
-        });
-
-        menu.addChild(qMenu);
+            return menu;
+        }
     }
+
+    videojs.registerComponent("QualitySelector", QualitySelector);
+
+    let controlBar = player.controlBar;
+    controlBar.addChild("QualitySelector", {}, controlBar.children().length - 1);
 }
 
 setInterval(checkStream, 3000);
