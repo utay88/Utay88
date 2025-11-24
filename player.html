@@ -1,75 +1,133 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canlı Yayın</title>
 
-<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet"/>
 
 <style>
-  body { margin:0; background:black; }
-  #player { width:100%; height:100vh; }
-  .plyr__menu__container { font-size:18px; }
+body { margin:0; background:black; }
+#my-video { width:100%; height:100vh; object-fit:contain; }
+
+#quality-btn {
+  position:absolute;
+  top:15px;
+  right:15px;
+  font-size:32px;
+  color:white;
+  z-index:9999;
+  cursor:pointer;
+}
+#quality-menu {
+  position:absolute;
+  top:60px;
+  right:15px;
+  background:rgba(0,0,0,0.85);
+  padding:10px;
+  border-radius:8px;
+  display:none;
+  z-index:9999;
+}
+#quality-menu div {
+  padding:6px 8px;
+  color:white;
+  cursor:pointer;
+}
+#quality-menu div:hover {
+  background:rgba(255,255,255,0.2);
+}
 </style>
 </head>
+
 <body>
 
-<video id="player" controls autoplay playsinline></video>
+<div id="quality-btn">⚙️</div>
+<div id="quality-menu"></div>
 
-<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<video id="my-video" class="video-js vjs-default-skin" controls autoplay playsinline></video>
+
+<script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
+
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
 let currentStream = "";
+let hls = null;
+let forcedQualityIndex = null;
 
-const video = document.getElementById("player");
-const player = new Plyr(video, {
-  settings: ['quality'],
-  quality: { default: 720, forced: true, options: [1440,1080,720,480,360] }
+const player = videojs("my-video", {
+  autoplay:true,
+  controls:true,
+  preload:"auto"
 });
 
-let hls;
+// Dişli menü aç/kapa
+document.getElementById("quality-btn").onclick = () => {
+  const m = document.getElementById("quality-menu");
+  m.style.display = (m.style.display === "block") ? "none" : "block";
+};
 
-function loadStream(url) {
+// Yayını yükle
+function loadStream(url){
   if (hls) hls.destroy();
 
-  if (Hls.isSupported()) {
-    hls = new Hls({
-      maxBufferLength: 10,
-      startLevel: -1,
-    });
-    hls.loadSource(url);
-    hls.attachMedia(video);
+  hls = new Hls({
+    autoStartLoad: true,
+    startLevel: forcedQualityIndex !== null ? forcedQualityIndex : -1
+  });
 
-    hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-      const levels = hls.levels.map(l => l.height).sort((a,b)=>b-a);
+  hls.loadSource(url);
+  hls.attachMedia(player.tech().el_);
 
-      player.quality.options = levels;
-      player.quality.default = levels[0];
+  hls.on(Hls.Events.MANIFEST_PARSED, function(_, data){
 
-      player.play();
-    });
+    const levels = data.levels;
+    buildQualityMenu(levels);
 
-    player.on('qualitychange', (e) => {
-      const q = e.detail.quality;
-      const levelIndex = hls.levels.findIndex(l => l.height === q);
-      hls.currentLevel = levelIndex;
-    });
+    // Daha önce kalite seçtiysen aynısını zorla
+    if (forcedQualityIndex !== null){
+      hls.currentLevel = forcedQualityIndex;
+    }
 
-  } else {
-    video.src = url;
-    video.play();
-  }
+    player.play();
+  });
 }
 
-function checkStream() {
-  fetch(kontrolURL + "?v=" + Date.now())
+// Kalite menüsü oluştur
+function buildQualityMenu(levels){
+  const menu = document.getElementById("quality-menu");
+  menu.innerHTML = "";
+
+  // Yüksekten düşüğe
+  const sorted = levels
+    .map((l,i)=>({height:l.height,index:i}))
+    .sort((a,b)=>b.height - a.height);
+
+  sorted.forEach(item=>{
+    const div = document.createElement("div");
+    div.innerText = item.height + "p";
+    div.onclick = ()=>{
+      forcedQualityIndex = item.index; // SEÇİMİ SABİTLE
+      hls.currentLevel = forcedQualityIndex;
+      document.getElementById("quality-menu").style.display="none";
+    };
+    menu.appendChild(div);
+  });
+
+  // Otomatik (ama sen istemiyorsun)
+  // İSTERSEN eklerim
+}
+
+// JSON takip
+function checkStream(){
+  fetch(kontrolURL + "?t=" + Date.now())
     .then(r=>r.json())
     .then(data=>{
-      if (data.yayin && data.yayin !== currentStream) {
+      if (data.yayin && data.yayin !== currentStream){
         currentStream = data.yayin;
         loadStream(currentStream);
       }
@@ -78,6 +136,7 @@ function checkStream() {
 
 checkStream();
 setInterval(checkStream, 3000);
+
 </script>
 
 </body>
