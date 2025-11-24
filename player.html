@@ -1,114 +1,79 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bolu: Doğanın Kalbi</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f9;
-            color: #333;
-        }
-        .container {
-            width: 80%;
-            margin: auto;
-            overflow: hidden;
-            padding: 20px;
-            background: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            margin-top: 30px;
-        }
-        header {
-            background: #007bff;
-            color: white;
-            padding: 10px 0;
-            text-align: center;
-            border-bottom: 5px solid #0056b3;
-        }
-        header h1 {
-            margin: 0;
-            font-size: 2.5em;
-        }
-        section {
-            padding: 20px 0;
-            border-bottom: 1px dashed #ccc;
-        }
-        section h2 {
-            color: #007bff;
-            border-bottom: 2px solid #ccc;
-            padding-bottom: 5px;
-        }
-        ul {
-            list-style: none;
-            padding: 0;
-        }
-        ul li {
-            background: #e9e9e9;
-            margin-bottom: 8px;
-            padding: 10px;
-            border-left: 5px solid #007bff;
-        }
-        .image-placeholder {
-            text-align: center;
-            margin: 20px 0;
-        }
-        .image-placeholder img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canlı Yayın</title>
+
+<link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet">
+<script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<style>
+    body {
+        margin: 0;
+        background: black;
+    }
+    #myvideo {
+        width: 100%;
+        height: 100vh;
+    }
+</style>
 </head>
+
 <body>
 
-<header>
-    <h1>🌲 Bolu: Doğanın ve Huzurun Başkenti 🌲</h1>
-</header>
+<video
+    id="myvideo"
+    class="video-js vjs-default-skin"
+    controls
+    autoplay
+    playsinline
+    webkit-playsinline>
+</video>
 
-<div class="container">
+<script>
+// GitHub'daki kontrol dosyan
+const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
-    <section id="giris">
-        <h2>Giriş ve Coğrafya</h2>
-        <p>Bolu, Türkiye'nin Karadeniz Bölgesi'nin Batı Karadeniz bölümünde yer alan, zengin ormanları, gölleri ve yaylaları ile ünlü bir ildir. Doğal güzellikleri sayesinde "Doğanın Kalbi" olarak anılır.</p>
-        <p>İstanbul ve Ankara gibi iki büyük metropolün ortasında bulunması, şehri turizm açısından stratejik bir konuma taşır.</p>
-    </section>
-    
-    <div class="image-placeholder">
-        <img src="https://via.placeholder.com/800x400?text=Bolu+Do%C4%9Fa+Manzaras%C4%B1" alt="Bolu Doğa Manzarası">
-    </div>
+let aktifYayin = null; // mevcut yayın
+let videoEl = document.getElementById("myvideo");
 
-    <section id="guzellikler">
-        <h2>Önemli Doğal Güzellikleri</h2>
-        <ul>
-            <li>**Abant Gölü:** Yılın her mevsimi ayrı bir güzellik sunan, fay hattı hareketleriyle oluşmuş heyelan set gölü.</li>
-            <li>**Yedigöller Milli Parkı:** Farklı büyüklükteki yedi göl (Büyükgöl, Seringöl, Deringöl vb.) ile meşhur, özellikle sonbaharda eşsiz manzaralar sunan bölge.</li>
-            <li>**Gölcük Tabiat Parkı:** Küçük, yapay bir göl olsa da, etrafındaki ormanlık alan ve göl kenarındaki dağ evi ile ünlü, popüler bir ziyaret noktası.</li>
-            <li>**Kartalkaya Kayak Merkezi:** Kış turizmi için önemli bir merkezdir.</li>
-        </ul>
-    </section>
+// M3U8 yayını oynatma fonksiyonu
+function oynat(url) {
+    if (Hls.isSupported()) {
+        let hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(videoEl);
+        videoEl.play();
+    } else {
+        videoEl.src = url;
+        videoEl.play();
+    }
+}
 
-    <section id="kultur">
-        <h2>Kültür ve Lezzet Durakları</h2>
-        <p>Bolu, aynı zamanda Türk mutfağının en yetenekli aşçılarını yetiştirmesiyle de ünlüdür. Mengen, özellikle aşçılık mesleği ile özdeşleşmiştir.</p>
-        <ul>
-            <li>**Mutfak:** Bolu'nun Mengen ilçesi, ünlü aşçıları ile bilinir ve her yıl Aşçılık ve Turizm Festivali'ne ev sahipliği yapar.</li>
-            <li>**Meşhur Lezzetler:** İzzet Baysal Üniversitesi'nin bulunduğu Bolu merkezinde, mantar, ovmaç çorbası, keşli cevizli erişte ve Köroğlu pilavı gibi yöresel yemekler tadılabilir.</li>
-            <li>**Tarihi Dokular:** Bolu Müzesi, Seben Kaya Evleri ve Mudurnu, Göynük gibi tarihi evleri koruyan Osmanlı kasabaları önemli kültürel miraslardır.</li>
-        </ul>
-    </section>
+// JSON dosyasını sürekli kontrol et
+function kontrolEt() {
+    fetch(kontrolURL + "?t=" + Date.now()) // cache engelle
+        .then(res => res.json())
+        .then(data => {
+            let yeniYayin = data.aktif_yayin;
 
-    <footer>
-        <p style="text-align: center; padding: 10px; background: #333; color: white; margin-top: 20px;">
-            &copy; 2025 Bolu Tanıtım Sayfası
-        </p>
-    </footer>
+            if (yeniYayin && yeniYayin !== aktifYayin) {
+                aktifYayin = yeniYayin;
+                oynat(aktifYayin);
+                console.log("Yeni yayın açıldı:", yeniYayin);
+            }
+        })
+        .catch(err => console.log("Kontrol hatası:", err));
+}
 
-</div>
+// Her 3 saniyede GitHub'ı kontrol et
+setInterval(kontrolEt, 3000);
+
+// Sayfa açılır açılmaz kontrol
+kontrolEt();
+</script>
 
 </body>
 </html>
