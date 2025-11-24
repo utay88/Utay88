@@ -1,214 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canlı Yayın</title>
-
-<link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
-
-<style>
-    body {
-        margin: 0;
-        background: black;
+  <meta charset="utf-8">
+  <title>Canlı HLS Video Oynatıcı</title>
+  <link href="https://vjs.zencdn.net/7.19.2/video-js.css" rel="stylesheet" />
+  <style>
+    /* Oynatıcı responsive olsun */
+    #player {
+      max-width: 100%;
+      height: auto;
     }
-
-    /* Tüm player alanı */
-    #player-wrap {
-        position: relative;
-        width: 100%;
-        height: 100vh;
-        background: black;
-        overflow: hidden;
+    /* İsteğe bağlı: Gear ikonu üst köşeye sabitle (örnek CSS) */
+    .vjs-http-source-selector .vjs-icon-placeholder:before {
+      content: "\f013"; /* FontAwesome gear ikonu (örnek) */
     }
-
-    #my-video {
-        width: 100%;
-        height: 100%;
+    .vjs-http-source-selector {
+      position: absolute;
+      top: 10px; right: 10px;
+      z-index: 10;
     }
-
-    /* Sağ üstte dişli */
-    #quality-btn {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        font-size: 32px;
-        color: white;
-        cursor: pointer;
-        z-index: 9999;
-        user-select: none;
-    }
-
-    /* Kalite menüsü */
-    #quality-menu {
-        position: absolute;
-        top: 55px;
-        right: 12px;
-        background: rgba(0,0,0,0.80);
-        padding: 10px 14px;
-        border-radius: 8px;
-        min-width: 130px;
-        display: none;
-        z-index: 9999;
-    }
-
-    #quality-menu div {
-        color: white;
-        padding: 6px 4px;
-        font-size: 17px;
-        cursor: pointer;
-    }
-
-    #quality-menu div:hover {
-        background: rgba(255,255,255,0.20);
-    }
-</style>
+  </style>
 </head>
 <body>
 
-<div id="player-wrap">
-    <video id="my-video" class="video-js vjs-default-skin" autoplay controls></video>
+  <!-- Video.js oynatıcı -->
+  <video
+    id="player"
+    class="video-js vjs-fluid vjs-big-play-centered"
+    controls preload="auto"
+    poster="placeholder.jpg"
+    data-setup='{}'>
+    <source src="https://example.com/stream/sample.m3u8" type="application/x-mpegURL">
+  </video>
 
-    <!-- Dişli ikonu -->
-    <div id="quality-btn">⚙</div>
+  <!-- Gerekli scriptler -->
+  <script src="https://vjs.zencdn.net/7.19.2/video.min.js"></script>
+  <script src="https://unpkg.com/videojs-contrib-hls/dist/videojs-contrib-hls.js"></script>
+  <script src="https://unpkg.com/videojs-http-source-selector/dist/videojs-http-source-selector.min.js"></script>
+  <script src="https://unpkg.com/videojs-contrib-quality-levels/dist/videojs-contrib-quality-levels.min.js"></script>
 
-    <!-- Kalite listesi -->
-    <div id="quality-menu"></div>
-</div>
-
-<script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
-<script>
-const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
-
-let currentStream = "";
-let hlsInstance = null;
-
-// VideoJS başlat
-var player = videojs("my-video", {
-    autoplay: true,
-    controls: true
-});
-
-// JSON’dan yayını kontrol et
-function checkStream() {
-    fetch(kontrolURL + "?v=" + Date.now())
-        .then(r => r.json())
-        .then(data => {
-            if (data.yayin && data.yayin !== currentStream) {
-                currentStream = data.yayin;
-                loadStream(currentStream);
-            }
-        })
-        .catch(() => {});
-}
-
-// Yayını yükle
-function loadStream(url) {
-
-    // Eski HLS varsa temizle
-    if (hlsInstance) {
-        hlsInstance.destroy();
-        hlsInstance = null;
-    }
-
-    if (Hls.isSupported()) {
-        hlsInstance = new Hls({ enableWorker: true });
-        hlsInstance.loadSource(url);
-        hlsInstance.attachMedia(player.tech().el_);
-
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function (_, data) {
-            buildQualityMenu(data.levels);
-            player.play();
-        });
-
-    } else {
-        // Eski tarayıcılar için
-        player.src({ src: url, type: "application/x-mpegURL" });
-        player.play();
-    }
-}
-
-// Kalite menüsünü oluştur
-function buildQualityMenu(levels) {
-    const menu = document.getElementById("quality-menu");
-    menu.innerHTML = "";
-
-    if (!levels || levels.length === 0) return;
-
-    // Yüksekten düşüğe sırala (1440, 1080, 720...)
-    levels.sort((a, b) => b.height - a.height);
-
-    levels.forEach((lvl, index) => {
-        const label = (lvl.height || "?") + "p";
-        const div = document.createElement("div");
-        div.textContent = label;
-
-        div.onclick = () => {
-            if (hlsInstance) {
-                hlsInstance.currentLevel = index;
-            }
-            menu.style.display = "none";
-        };
-
-        menu.appendChild(div);
+  <script>
+    // Video.js oynatıcıyı başlat ve kalite seçici eklentisini ekle
+    var player = videojs('player', {
+      plugins: {
+        httpSourceSelector: { default: 'auto' }
+      }
     });
+    player.httpSourceSelector();
 
-    // Otomatik kalite
-    const auto = document.createElement("div");
-    auto.textContent = "Otomatik";
-    auto.onclick = () => {
-        if (hlsInstance) {
-            hlsInstance.currentLevel = -1;
+    // JSON ile yayın kontrolü ve otomatik değiştirme
+    let currentStream = '';
+    async function checkStream() {
+      try {
+        const res = await fetch('kontrol.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.stream && data.stream !== currentStream) {
+          currentStream = data.stream;
+          player.src({ src: currentStream, type: 'application/x-mpegURL' });
         }
-        menu.style.display = "none";
-    };
-    menu.appendChild(auto);
-}
-
-// Dişliye tıklayınca menüyü aç/kapat
-document.getElementById("quality-btn").onclick = () => {
-    const menu = document.getElementById("quality-menu");
-    menu.style.display = (menu.style.display === "block") ? "none" : "block";
-};
-
-// Her 3 saniyede JSON’u kontrol et
-setInterval(checkStream, 3000);
-checkStream();
-</script>
-
+      } catch (e) { console.error(e); }
+    }
+    checkStream();
+    setInterval(checkStream, 10000);
+  </script>
 </body>
 </html>
-
-
----
-
-Şimdi yapacağın tek şey:
-
-1. GitHub’da player.html aç
-
-
-2. İçindeki HER ŞEYİ sil
-
-
-3. Yukarıdaki dosyayı komple yapıştır
-
-
-4. Commit / Save
-
-
-5. Telefonda şu linkle aç:
-
-
-
-https://utay88.github.io/Utay88/player.html?v=2
-
-Yayın oynarken bile sağ üstte ⚙ hep duracak
-
-Ekrana tıklamana gerek yok
-
-İstediğin an tıkla, çözünürlüğü değiştir, yayın kesilmeden devam et
-
-
-Sonra bana sadece şunu yaz:
-“Oldu” veya “Şu detay hoşuma gitmedi” – oradan ince ayar yaparız.
