@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>CanlÄ± YayÄ±n</title>
+<title>Canlı Yayın</title>
 
 <style>
     body { margin:0; background:black; overflow:hidden; }
@@ -51,8 +51,8 @@
             <input type="range" id="seek" min="0" max="100" value="0">
         </div>
 
-        <div id="volumeBtn">ðŸ”Š</div>
-        <div id="fsBtn">â›¶</div>
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⛶</div>
     </div>
 </div>
 
@@ -69,7 +69,7 @@ let hls;
 let currentStream = "";
 
 /* -------------------------
-   ALT BAR OTOMATÄ°K GÄ°ZLENME
+   ALT BAR OTOMATİK GİZLENME
 --------------------------*/
 function showControls() {
     controls.style.opacity = 1;
@@ -82,7 +82,7 @@ document.body.addEventListener("mousemove", showControls);
 document.body.addEventListener("click", showControls);
 
 /* -------------------------
-   YAYINI YÃœKLE
+   YAYINI YÜKLE
 --------------------------*/
 function loadStream(url) {
     if (hls) hls.destroy();
@@ -96,7 +96,7 @@ function loadStream(url) {
         hls.loadSource(url);
         hls.attachMedia(video);
 
-        /* EN YÃœKSEK KALÄ°TEYE SABÄ°TLEME */
+        /* EN YÜKSEK KALİTEYE SABİTLEME */
         hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
             if (data.levels && data.levels.length > 0) {
                 let highest = data.levels.length - 1;
@@ -105,7 +105,7 @@ function loadStream(url) {
             video.play();
         });
 
-        /* EÄŸer kalite deÄŸiÅŸmeye Ã§alÄ±ÅŸÄ±rsa tekrar en yÃ¼kseÄŸe Ã§ek */
+        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
         hls.on(Hls.Events.LEVEL_SWITCHING, function () {
             hls.nextLevel = hls.levels.length - 1;
         });
@@ -117,7 +117,7 @@ function loadStream(url) {
 }
 
 /* -------------------------
-   JSON TAKÄ°P
+   JSON TAKİP
 --------------------------*/
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
