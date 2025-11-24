@@ -2,167 +2,182 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Live Player</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canlı Yayın</title>
 
 <style>
-    body {
-        margin: 0;
-        background: #000;
-        overflow: hidden;
+    body { margin:0; background:black; overflow:hidden; }
+    #videoContainer {
+        width:100vw;
+        height:100vh;
+        position:relative;
+        background:black;
+    }
+    video {
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        background:black;
     }
 
-    #videoPlayer {
-        width: 100%;
-        height: auto;
-        max-height: 100vh;
-        background: #000;
-    }
-
-    /* ALT BAR */
-    .controls {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        padding: 10px 0;
-        background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0));
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
+    /* Alt bar */
+    #controls {
+        position:absolute;
+        bottom:0;
+        left:0;
+        width:100%;
+        height:55px;
+        background:rgba(0,0,0,0.55);
+        display:flex;
+        align-items:center;
+        padding:0 12px;
+        opacity:0;
+        transition:opacity .3s;
+        /* DÜZELTME: Öğeler arasında boşluk bırakmak yerine merkezleme yapalım */
+        box-sizing: border-box; /* padding'i width içine dahil et */
     }
 
     /* LIVE */
-    .live {
-        color: red;
-        font-size: 18px;
-        margin-left: 15px;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
+    #liveTag {
+        color:white;
+        font-size:15px;
+        display:flex;
+        align-items:center;
+        margin-right:10px;
+        /* DÜZELTME: Bu öğenin boyutunun sabit kalmasını sağlar */
+        flex-shrink: 0;
+    }
+    #liveTag::before {
+        content:"";
+        width:10px;
+        height:10px;
+        background:red;
+        border-radius:50%;
+        margin-right:6px;
+        display:inline-block;
     }
 
-    .live::before {
-        content: "●";
-        color: red;
-        margin-right: 6px;
+    /* Progress bar */
+    #progress {
+        flex:1;
+        margin:0 12px;
+        /* DÜZELTME: Bu öğenin esnek bir şekilde dolmasını sağlar */
+        min-width: 0;
+    }
+    #progress input {
+        width:100%;
+        /* DÜZELTME: Range input'un dikey olarak ortalanmasına yardımcı olur */
+        display: block;
     }
 
-    /* SLIDER */
-    .slider {
-        -webkit-appearance: none;
-        width: 60%;
-        height: 6px;
-        background: #ccc;
-        border-radius: 5px;
+    /* Buttons */
+    #volumeBtn, #fsBtn {
+        font-size:28px;
+        color:white;
+        margin-left:10px;
+        cursor:pointer;
+        /* DÜZELTME: Bu düğmelerin boyutlarının sabit kalmasını sağlar */
+        flex-shrink: 0;
     }
-
-    .slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 18px;
-        height: 18px;
-        background: #007aff;
-        border-radius: 50%;
-    }
-
-    /* SES BUTONU */
-    .sound {
-        font-size: 28px;
-        color: white;
-        margin-right: 15px;
-    }
-
-    /* FULLSCREEN (YouTube kare ikon) */
-    .fs-btn {
-        width: 28px;
-        height: 28px;
-        border: 2px solid white;
-        border-radius: 4px;
-        margin-right: 15px;
-        position: relative;
-        cursor: pointer;
-    }
-
-    .fs-btn::before {
-        content: "";
-        width: 14px;
-        height: 14px;
-        border: 2px solid white;
-        border-radius: 2px;
-        position: absolute;
-        top: 5px;
-        left: 5px;
-    }
-
 </style>
 </head>
+
 <body>
 
-<!-- PLAYER -->
-<video id="videoPlayer" controls playsinline>
-    <source src="https://tv-trtspor1.medya.trt.com.tr/master.m3u8" type="application/x-mpegURL">
-</video>
+<div id="videoContainer">
+    <video id="player" autoplay playsinline></video>
 
-<!-- ALT BAR -->
-<div class="controls">
-    <div class="live">LIVE</div>
+    <div id="controls">
+        <div id="liveTag">LIVE</div>
 
-    <input type="range" id="seekBar" class="slider" min="0" value="0">
+        <div id="progress">
+            <input type="range" id="seek" min="0" max="100" value="0">
+        </div>
 
-    <div class="sound" id="soundBtn">🔊</div>
-
-    <div class="fs-btn" onclick="toggleFullscreen()"></div>
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⛶</div>
+    </div>
 </div>
 
-<script>
-    const video = document.getElementById("videoPlayer");
-    const seekBar = document.getElementById("seekBar");
-    const soundBtn = document.getElementById("soundBtn");
-
-    // SES
-    soundBtn.onclick = () => {
-        video.muted = !video.muted;
-        soundBtn.textContent = video.muted ? "🔇" : "🔊";
-    };
-
-    // GERİ/İLERİ ALMA – DONMA ÖNLEME
-    video.addEventListener("loadedmetadata", () => {
-        seekBar.max = video.duration;
-    });
-
-    setInterval(() => {
-        if (!video.paused) {
-            seekBar.value = video.currentTime;
-        }
-    }, 500);
-
-    seekBar.onchange = () => {
-        video.currentTime = seekBar.value;
-        video.play();
-    };
-
-    // FULLSCREEN
-    function toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
-        } else {
-            document.exitFullscreen();
-        }
-    }
-
-    // OTOMATİK EN YÜKSEK KALİTE
-    if (Hls.isSupported()) {
-        var hls = new Hls({ maxMaxBufferLength: 60 });
-        hls.loadSource("https://tv-trtspor1.medya.trt.com.tr/master.m3u8");
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function(event, data) {
-            hls.loadLevel = data.levels.length - 1;
-        });
-    }
-</script>
-
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<script>
+const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+
+let video = document.getElementById("player");
+let controls = document.getElementById("controls");
+let seek = document.getElementById("seek");
+let hideTimer;
+let hls;
+let currentStream = "";
+
+// BAR GÖSTER / GİZLE
+function showControls() {
+    controls.style.opacity = 1;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        controls.style.opacity = 0;
+    }, 3000);
+}
+document.body.addEventListener("mousemove", showControls);
+document.body.addEventListener("click", showControls);
+
+// YAYINI YÜKLE
+function loadStream(url) {
+    if (hls) { hls.destroy(); }
+    video.src = "";
+
+    if (Hls.isSupported()) {
+        hls = new Hls({maxMaxBufferLength:20});
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play();
+        });
+    } else {
+        video.src = url;
+        video.play();
+    }
+}
+
+// JSON TAKİP
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
+        .then(r => r.json())
+        .then(d => {
+            if (d.yayin && d.yayin !== currentStream) {
+                currentStream = d.yayin;
+                loadStream(currentStream);
+            }
+        });
+}
+setInterval(checkStream, 3000);
+checkStream();
+
+// SEEK BAR
+video.addEventListener("timeupdate", () => {
+    if (!video.duration) return;
+    seek.value = (video.currentTime / video.duration) * 100;
+});
+
+seek.addEventListener("input", () => {
+    video.currentTime = (seek.value / 100) * video.duration;
+});
+
+// SES
+document.getElementById("volumeBtn").onclick = () => {
+    video.muted = !video.muted;
+};
+
+// FULLSCREEN
+document.getElementById("fsBtn").onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+};
+</script>
 
 </body>
 </html>
