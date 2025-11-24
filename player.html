@@ -59,8 +59,10 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
+/* ===============================
+   ✔ JSON KANAL TAKİP
+================================ */
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
-
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
 let seek = document.getElementById("seek");
@@ -68,9 +70,9 @@ let hideTimer;
 let hls;
 let currentStream = "";
 
-/* -------------------------
-   ALT BAR OTOMATİK GİZLENME
---------------------------*/
+/* ===============================
+   ✔ ALT BAR OTOMATİK GİZLENME
+================================ */
 function showControls() {
     controls.style.opacity = 1;
     clearTimeout(hideTimer);
@@ -81,9 +83,9 @@ function showControls() {
 document.body.addEventListener("mousemove", showControls);
 document.body.addEventListener("click", showControls);
 
-/* -------------------------
-   YAYINI YÜKLE
---------------------------*/
+/* ===============================
+   ✔ YAYINI YÜKLE
+================================ */
 function loadStream(url) {
     if (hls) hls.destroy();
     video.src = "";
@@ -96,16 +98,16 @@ function loadStream(url) {
         hls.loadSource(url);
         hls.attachMedia(video);
 
-        /* EN YÜKSEK KALİTEYE SABİTLEME */
+        // ✔ En yüksek kaliteye sabitle
         hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
             if (data.levels && data.levels.length > 0) {
                 let highest = data.levels.length - 1;
-                hls.currentLevel = highest;   // kaliteyi kilitle
+                hls.currentLevel = highest;
             }
             video.play();
         });
 
-        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
+        // ✔ Kalite değişmek isterse tekrar kilitle
         hls.on(Hls.Events.LEVEL_SWITCHING, function () {
             hls.nextLevel = hls.levels.length - 1;
         });
@@ -116,15 +118,17 @@ function loadStream(url) {
     }
 }
 
-/* -------------------------
-   JSON TAKİP
---------------------------*/
+/* ===============================
+   ✔ JSON'DAN YAYIN TAKİP
+================================ */
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
         .then(d => {
-            if (d.yayin && d.yayin !== currentStream) {
-                currentStream = d.yayin;
+            // Burada sen her HTML için kanal adi set edeceksin:
+            const kanalAdi = window.kanalAdi || "trtspor"; 
+            if (d.kanallar[kanalAdi] && d.kanallar[kanalAdi] !== currentStream) {
+                currentStream = d.kanallar[kanalAdi];
                 loadStream(currentStream);
             }
         });
@@ -132,9 +136,9 @@ function checkStream() {
 setInterval(checkStream, 3000);
 checkStream();
 
-/* -------------------------
-   SEEK BAR
---------------------------*/
+/* ===============================
+   ✔ SEEK BAR
+================================ */
 video.addEventListener("timeupdate", () => {
     if (!video.duration) return;
     seek.value = (video.currentTime / video.duration) * 100;
@@ -143,16 +147,16 @@ seek.addEventListener("input", () => {
     video.currentTime = (seek.value / 100) * video.duration;
 });
 
-/* -------------------------
-   SES
---------------------------*/
+/* ===============================
+   ✔ SES
+================================ */
 document.getElementById("volumeBtn").onclick = () => {
     video.muted = !video.muted;
 };
 
-/* -------------------------
-   TAM EKRAN
---------------------------*/
+/* ===============================
+   ✔ TAM EKRAN
+================================ */
 document.getElementById("fsBtn").onclick = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
@@ -160,6 +164,25 @@ document.getElementById("fsBtn").onclick = () => {
         document.exitFullscreen();
     }
 };
+
+/* ============================================
+   ✔ ESC / BACK TUŞU TAM GARANTİ ÇALIŞSIN
+=============================================== */
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" || e.key === "Backspace") {
+
+        // Önce tam ekrandan çık
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+            return;
+        }
+
+        // Sonra sayfadan çık (TV Box ve Android TV için garanti)
+        if (history.length > 1) {
+            history.back();
+        }
+    }
+});
 </script>
 
 </body>
