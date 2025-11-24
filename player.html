@@ -1,142 +1,103 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canlı Yayın</title>
 
-<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet"/>
+<!-- Cache sorunu OLMASIN diye -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+
+<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
 
 <style>
 body { margin:0; background:black; }
 #my-video { width:100%; height:100vh; object-fit:contain; }
-
-#quality-btn {
-  position:absolute;
-  top:15px;
-  right:15px;
-  font-size:32px;
-  color:white;
-  z-index:9999;
-  cursor:pointer;
-}
-#quality-menu {
-  position:absolute;
-  top:60px;
-  right:15px;
-  background:rgba(0,0,0,0.85);
-  padding:10px;
-  border-radius:8px;
-  display:none;
-  z-index:9999;
-}
-#quality-menu div {
-  padding:6px 8px;
-  color:white;
-  cursor:pointer;
-}
-#quality-menu div:hover {
-  background:rgba(255,255,255,0.2);
-}
 </style>
 </head>
 
 <body>
 
-<div id="quality-btn">⚙️</div>
-<div id="quality-menu"></div>
+<video
+  id="my-video"
+  class="video-js vjs-default-skin vjs-big-play-centered"
+  controls
+  autoplay
+  playsinline
+></video>
 
-<video id="my-video" class="video-js vjs-default-skin" controls autoplay playsinline></video>
-
+<!-- VideoJS -->
 <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+
+<!-- HLS -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-<script>
+<!-- Kalite seviyeleri -->
+<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels/dist/videojs-contrib-quality-levels.min.js"></script>
 
+<!-- Çözünürlük seçici -->
+<script src="https://cdn.jsdelivr.net/npm/videojs-http-source-selector/dist/videojs-http-source-selector.min.js"></script>
+
+<script>
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
 let currentStream = "";
 let hls = null;
-let forcedQualityIndex = null;
 
+// Player
 const player = videojs("my-video", {
-  autoplay:true,
-  controls:true,
-  preload:"auto"
+    autoplay: true,
+    controls: true,
+    preload: "auto"
 });
 
-// Dişli menü aç/kapa
-document.getElementById("quality-btn").onclick = () => {
-  const m = document.getElementById("quality-menu");
-  m.style.display = (m.style.display === "block") ? "none" : "block";
-};
+// Çözünürlük butonunu aktif et
+player.ready(() => {
+    player.httpSourceSelector({
+        default: "auto"
+    });
+});
+
+// JSON kontrolü
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
+        .then(r => r.json())
+        .then(data => {
+            if (data.yayin && data.yayin !== currentStream) {
+                currentStream = data.yayin;
+                loadStream(currentStream);
+            }
+        })
+        .catch(e => console.log("JSON okunamadı:", e));
+}
 
 // Yayını yükle
-function loadStream(url){
-  if (hls) hls.destroy();
-
-  hls = new Hls({
-    autoStartLoad: true,
-    startLevel: forcedQualityIndex !== null ? forcedQualityIndex : -1
-  });
-
-  hls.loadSource(url);
-  hls.attachMedia(player.tech().el_);
-
-  hls.on(Hls.Events.MANIFEST_PARSED, function(_, data){
-
-    const levels = data.levels;
-    buildQualityMenu(levels);
-
-    // Daha önce kalite seçtiysen aynısını zorla
-    if (forcedQualityIndex !== null){
-      hls.currentLevel = forcedQualityIndex;
+function loadStream(url) {
+    if (hls) {
+        hls.destroy();
+        hls = null;
     }
 
-    player.play();
-  });
+    if (Hls.isSupported()) {
+        hls = new Hls({ enableWorker: true });
+        hls.loadSource(url);
+        hls.attachMedia(player.tech().el_);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            player.play();
+        });
+    } else {
+        player.src({ src: url, type: "application/x-mpegURL" });
+        player.play();
+    }
 }
 
-// Kalite menüsü oluştur
-function buildQualityMenu(levels){
-  const menu = document.getElementById("quality-menu");
-  menu.innerHTML = "";
-
-  // Yüksekten düşüğe
-  const sorted = levels
-    .map((l,i)=>({height:l.height,index:i}))
-    .sort((a,b)=>b.height - a.height);
-
-  sorted.forEach(item=>{
-    const div = document.createElement("div");
-    div.innerText = item.height + "p";
-    div.onclick = ()=>{
-      forcedQualityIndex = item.index; // SEÇİMİ SABİTLE
-      hls.currentLevel = forcedQualityIndex;
-      document.getElementById("quality-menu").style.display="none";
-    };
-    menu.appendChild(div);
-  });
-
-  // Otomatik (ama sen istemiyorsun)
-  // İSTERSEN eklerim
-}
-
-// JSON takip
-function checkStream(){
-  fetch(kontrolURL + "?t=" + Date.now())
-    .then(r=>r.json())
-    .then(data=>{
-      if (data.yayin && data.yayin !== currentStream){
-        currentStream = data.yayin;
-        loadStream(currentStream);
-      }
-    });
-}
-
+// İlk yükleme
 checkStream();
-setInterval(checkStream, 3000);
 
+// Her 3 saniyede bir yayın değişti mi kontrol et
+setInterval(checkStream, 3000);
 </script>
 
 </body>
