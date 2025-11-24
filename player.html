@@ -1,133 +1,93 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <title>TV Player (Video.js + HLS)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Player</title>
 
-  <!-- SAYFA / PLAYER TAM EKRAN -->
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-    }
-    #player-wrap {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      background: #000;
-    }
-    .video-js {
-      width: 100%;
-      height: 100%;
-      font-size: 14px;
-    }
-  </style>
+<style>
+html, body {
+    margin:0;
+    padding:0;
+    background:#000;
+    height:100%;
+    overflow:hidden;
+}
+#video {
+    width:100%;
+    height:100%;
+    background:#000;
+}
+</style>
 
-  <!-- VIDEO.JS ve HLS KALİTE PLUGINLERİ -->
-  <link
-    href="https://vjs.zencdn.net/8.10.0/video-js.css"
-    rel="stylesheet"
-  />
-  <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-  <!-- Quality levels + hls-quality-selector -->
-  <script src="https://unpkg.com/videojs-contrib-quality-levels@2.2.0/dist/videojs-contrib-quality-levels.min.js"></script>
-  <script src="https://unpkg.com/videojs-hls-quality-selector@1.1.3/dist/videojs-hls-quality-selector.min.js"></script>
 </head>
-
 <body>
-  <div id="player-wrap">
-    <video
-      id="tvplayer"
-      class="video-js vjs-default-skin"
-      controls
-      autoplay
-      muted
-      playsinline
-    ></video>
-  </div>
 
-  <script>
-    // ======= JSON AYARI ======= 
-    // YAYIN LİSTESİNİ OKUDUĞUN JSON DOSYASI
-    // Burayı kendi RAW JSON linkinle DEĞİŞTİR:
-    const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
+<video id="video" controls autoplay playsinline></video>
 
-    // JSON İÇERİĞİ (kontrol.json) ŞÖYLE OLMALI:
-    // {
-    //   "channel": "https://tv-trt1.medya.trt.com.tr/master.m3u8"
-    // }
+<script>
+// JSON’dan okunan yayın linki
+const url = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
-    let lastSrc = null;
+let hls;
+let currentChannel = null;
 
-    // VIDEO.JS PLAYER
-    const player = videojs("tvplayer", {
-      autoplay: true,       // otomatik başlat
-      muted: true,          // autoplay için gerekli
-      controls: true,
-      preload: "auto",
-      fluid: false          // biz tam ekran CSS ile çözüyoruz
-    });
-
-    // HLS kalite seçici
-    player.ready(function () {
-      if (player.hlsQualitySelector) {
-        player.hlsQualitySelector({
-          displayCurrentQuality: true
-        });
-      }
-    });
-
-    // Oynatmaya başlayınca sesi açmayı dene (WebView genelde izin verir)
-    player.on("playing", function () {
-      try {
-        if (player.muted()) {
-          player.muted(false);
+// JSON'u oku
+async function loadJSON() {
+    try {
+        let r = await fetch(url + "?t=" + Date.now());
+        let data = await r.json();
+        if (data.channel && data.channel !== currentChannel) {
+            currentChannel = data.channel;
+            startStream(currentChannel);
         }
-        player.volume(1.0);
-      } catch (e) {}
-    });
+    } catch (e) {
+        console.log("JSON okunamadı", e);
+    }
+}
 
-    // Hata olursa yayını tekrar dene (TRT token / kesilme durumları için)
-    player.on("error", function () {
-      if (!lastSrc) return;
-      setTimeout(function () {
-        player.src({ src: lastSrc, type: "application/x-mpegURL" });
-        player.play().catch(function () {});
-      }, 2000);
-    });
+// Hızlı açılan HLS player
+function startStream(src) {
+    const video = document.getElementById("video");
 
-    // JSON’dan yayını al ve gerektiğinde güncelle
-    function loadStream() {
-      fetch(jsonURL + "?t=" + Date.now()) // cache kırmak için
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (!data || !data.channel) return;
-
-          // Yayın değişmişse anında güncelle
-          if (data.channel !== lastSrc) {
-            lastSrc = data.channel;
-            player.src({
-              src: lastSrc,
-              type: "application/x-mpegURL"
-            });
-            player.play().catch(function () {});
-          }
-        })
-        .catch(function (e) {
-          console.log("JSON okunamadı:", e);
-        });
+    if (hls) {
+        hls.destroy();
+        hls = null;
     }
 
-    // İlk açılışta yayını yükle
-    loadStream();
-    // Sonra her 5 saniyede bir JSON’u kontrol et
-    setInterval(loadStream, 5000);
-  </script>
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            maxMaxBufferLength: 3,   // HIZLI AÇILMA İÇİN OPTİMUM
+            startPosition: -1,       // ANINDA BAŞLATIR
+            manifestLoadingTimeOut: 8000,
+            manifestLoadingMaxRetry: 5
+        });
+
+        hls.loadSource(src);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            video.play().catch(()=>{});
+        });
+
+        hls.on(Hls.Events.ERROR, function () {
+            setTimeout(() => startStream(src), 2000);
+        });
+
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = src;
+        video.play().catch(()=>{});
+    }
+}
+
+// İlk başlatma
+loadJSON();
+
+// 5 saniyede bir yayın değişti mi kontrol et
+setInterval(loadJSON, 5000);
+</script>
+
 </body>
 </html>
