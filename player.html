@@ -16,7 +16,8 @@
         background:rgba(0,0,0,0.55);
         display:flex; align-items:center;
         padding:0 12px;
-        opacity:0; transition:opacity .3s;
+        opacity:0; 
+        transition:opacity .3s;
         box-sizing: border-box;
     }
 
@@ -61,9 +62,9 @@
 <script>
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
-let video = document.getElementById("player");
-let controls = document.getElementById("controls");
-let seek = document.getElementById("seek");
+let video       = document.getElementById("player");
+let controls    = document.getElementById("controls");
+let seek        = document.getElementById("seek");
 let hideTimer;
 let hls;
 let currentStream = "";
@@ -90,24 +91,26 @@ function loadStream(url) {
 
     if (Hls.isSupported()) {
         hls = new Hls({
-            maxMaxBufferLength:20
+            maxMaxBufferLength: 20
         });
 
         hls.loadSource(url);
         hls.attachMedia(video);
 
-        /* EN YÜKSEK KALİTEYE SABİTLEME */
         hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+            // En yüksek kaliteye kilitle
             if (data.levels && data.levels.length > 0) {
                 let highest = data.levels.length - 1;
-                hls.currentLevel = highest;   // kaliteyi kilitle
+                hls.currentLevel = highest;
             }
             video.play();
         });
 
-        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
+        // Kalite değişmek isterse tekrar en yükseğe çek
         hls.on(Hls.Events.LEVEL_SWITCHING, function () {
-            hls.nextLevel = hls.levels.length - 1;
+            if (hls.levels && hls.levels.length > 0) {
+                hls.nextLevel = hls.levels.length - 1;
+            }
         });
 
     } else {
@@ -127,7 +130,8 @@ function checkStream() {
                 currentStream = d.yayin;
                 loadStream(currentStream);
             }
-        });
+        })
+        .catch(e => console.log("JSON okunamadı:", e));
 }
 setInterval(checkStream, 3000);
 checkStream();
@@ -140,6 +144,7 @@ video.addEventListener("timeupdate", () => {
     seek.value = (video.currentTime / video.duration) * 100;
 });
 seek.addEventListener("input", () => {
+    if (!video.duration) return;
     video.currentTime = (seek.value / 100) * video.duration;
 });
 
