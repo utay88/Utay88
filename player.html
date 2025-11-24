@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canlı Yayın</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Canlı Yayın</title>
 
-<link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
+    <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
 
-<style>
-body { margin: 0; background: black; }
-#my-video { width: 100%; height: 100vh; }
-</style>
-
+    <style>
+        body { margin: 0; background: black; }
+        #my-video { width: 100%; height: 100vh; }
+        .vjs-menu li { font-size: 18px; }
+    </style>
 </head>
+
 <body>
 
 <video id="my-video" class="video-js vjs-default-skin" autoplay controls></video>
@@ -39,13 +40,47 @@ function checkStream() {
 
 function loadStream(url) {
     if (Hls.isSupported()) {
-        const hls = new Hls();
+        const hls = new Hls({ enableWorker: true });
+
         hls.loadSource(url);
         hls.attachMedia(player.tech().el_);
-        player.play();
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function (_, data) {
+            addQualityMenu(hls, data.levels);
+            player.play();
+        });
+
     } else {
         player.src({ src: url, type: 'application/x-mpegURL' });
         player.play();
+    }
+}
+
+function addQualityMenu(hls, levels) {
+    if (!player.controlBar.getChild('QualitySelector')) {
+        let menu = player.controlBar.addChild('menu-button', {}, 0);
+        menu.addClass("vjs-icon-cog");
+        menu.addClass("vjs-quality-selector");
+
+        let qMenu = menu.createMenu();
+
+        levels.forEach((level, index) => {
+            let label = (level.height ? level.height + "p" : "Otomatik");
+
+            let item = new videojs.getComponent('MenuItem')(player, {
+                label: label,
+                selectable: true,
+                selected: index === hls.currentLevel
+            });
+
+            item.on('click', () => {
+                hls.currentLevel = index;
+            });
+
+            qMenu.addChild(item);
+        });
+
+        menu.addChild(qMenu);
     }
 }
 
