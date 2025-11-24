@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>Canlı Yayın</title>
 
-<link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet">
+<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet"/>
 
 <style>
 body { margin:0; background:black; }
@@ -15,34 +14,71 @@ body { margin:0; background:black; }
 </head>
 <body>
 
-<video id="my-video" class="video-js vjs-default-skin" controls autoplay playsinline></video>
+<video
+  id="my-video"
+  class="video-js vjs-big-play-centered"
+  controls
+  autoplay
+  playsinline
+></video>
 
-<script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+<script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@2.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-http-source-selector@1.1.7/dist/videojs-http-source-selector.min.js"></script>
 
 <script>
-
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
 let currentStream = "";
 let hls = null;
 
 const player = videojs("my-video", {
-  controls: true,
   autoplay: true,
+  controls: true,
   preload: "auto"
 });
 
-player.ready(function() {
-  player.httpSourceSelector({
-    default: 'auto'
-  });
-});
+// ZORUNLU BUFFER TEMİZLEME — GEÇİŞİ %100 HIZLANDIRIR
+function applyForceReset(video) {
+  try {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  } catch(e){}
+}
+
+function loadStream(url) {
+
+  // Önce tamamen buffer’ı sıfırlıyoruz
+  applyForceReset(player.tech().el_);
+
+  // Hls varsa tamamen yok ediyoruz
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
+
+  // Yeni HLS instance
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      maxBufferLength: 1,
+      maxMaxBufferLength: 1,
+      backBufferLength: 0
+    });
+
+    hls.loadSource(url);
+    hls.attachMedia(player.tech().el_);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, function () {
+      player.play();
+    });
+  } else {
+    player.src({ src:url, type:"application/x-mpegURL" });
+    player.play();
+  }
+}
 
 function checkStream() {
-  fetch(kontrolURL + "?x=" + Date.now())
+  fetch(kontrolURL + "?t=" + Date.now())
     .then(r => r.json())
     .then(data => {
       if (data.yayin && data.yayin !== currentStream) {
@@ -52,23 +88,8 @@ function checkStream() {
     });
 }
 
-function loadStream(url) {
-  if (hls) hls.destroy();
-
-  if (Hls.isSupported()) {
-    hls = new Hls();
-    hls.loadSource(url);
-    hls.attachMedia(player.tech().el_);
-  } else {
-    player.src({ src: url, type: "application/x-mpegURL" });
-  }
-
-  player.play();
-}
-
 checkStream();
 setInterval(checkStream, 3000);
-
 </script>
 
 </body>
