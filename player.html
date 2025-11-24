@@ -1,168 +1,181 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canlı Yayın</title>
 
 <style>
-body {
-  margin:0;
-  background:black;
-  overflow:hidden;
-}
+    body { margin:0; background:black; overflow:hidden; }
+    #videoContainer {
+        width:100vw;
+        height:100vh;
+        position:relative;
+        background:black;
+    }
+    video {
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        background:black;
+    }
 
-#videoContainer {
-  position:fixed;
-  top:0; left:0;
-  width:100%;
-  height:100%;
-}
+    /* Alt bar */
+    #controls {
+        position:absolute;
+        bottom:0;
+        left:0;
+        width:100%;
+        height:55px;
+        background:rgba(0,0,0,0.55);
+        display:flex;
+        align-items:center;
+        padding:0 12px;
+        opacity:0;
+        transition:opacity .3s;
+        /* DÜZELTME: Öğeler arasında boşluk bırakmak yerine merkezleme yapalım */
+        box-sizing: border-box; /* padding'i width içine dahil et */
+    }
 
-#player {
-  width:100%;
-  height:100%;
-  object-fit:contain;
-}
+    /* LIVE */
+    #liveTag {
+        color:white;
+        font-size:15px;
+        display:flex;
+        align-items:center;
+        margin-right:10px;
+        /* DÜZELTME: Bu öğenin boyutunun sabit kalmasını sağlar */
+        flex-shrink: 0;
+    }
+    #liveTag::before {
+        content:"";
+        width:10px;
+        height:10px;
+        background:red;
+        border-radius:50%;
+        margin-right:6px;
+        display:inline-block;
+    }
 
-/* ALT BAR */
-#controls {
-  position:absolute;
-  bottom:0;
-  left:0;
-  width:100%;
-  padding:10px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  background:rgba(0,0,0,0.35);
-  transition:opacity .4s;
-  opacity:0;
-}
+    /* Progress bar */
+    #progress {
+        flex:1;
+        margin:0 12px;
+        /* DÜZELTME: Bu öğenin esnek bir şekilde dolmasını sağlar */
+        min-width: 0;
+    }
+    #progress input {
+        width:100%;
+        /* DÜZELTME: Range input'un dikey olarak ortalanmasına yardımcı olur */
+        display: block;
+    }
 
-#controls.show { opacity:1; }
-
-.liveGroup {
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-
-.liveDot {
-  width:10px;
-  height:10px;
-  background:red;
-  border-radius:50%;
-}
-
-.liveText {
-  color:white;
-  font-size:16px;
-}
-
-#progress {
-  width:70%;      /* SADECE BUNU DÜŞÜRDÜM – TAŞMA YOK */
-}
-
-#progress input {
-  width:100%;
-}
-
-.ctrlBtn {
-  font-size:26px;
-  color:white;
-  padding:4px;
-  cursor:pointer;
-}
-
+    /* Buttons */
+    #volumeBtn, #fsBtn {
+        font-size:28px;
+        color:white;
+        margin-left:10px;
+        cursor:pointer;
+        /* DÜZELTME: Bu düğmelerin boyutlarının sabit kalmasını sağlar */
+        flex-shrink: 0;
+    }
 </style>
 </head>
 
 <body>
 
 <div id="videoContainer">
+    <video id="player" autoplay playsinline></video>
 
-  <video id="player" playsinline></video>
+    <div id="controls">
+        <div id="liveTag">LIVE</div>
 
-  <div id="controls">
-      <div class="liveGroup">
-        <div class="liveDot"></div>
-        <div class="liveText">LIVE</div>
-      </div>
+        <div id="progress">
+            <input type="range" id="seek" min="0" max="100" value="0">
+        </div>
 
-      <div id="progress">
-        <input type="range" id="seek" min="0" max="100" value="0">
-      </div>
-
-      <div id="muteBtn" class="ctrlBtn">🔊</div>
-      <div id="fsBtn" class="ctrlBtn">⛶</div>
-  </div>
-
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⛶</div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
+const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
 let seek = document.getElementById("seek");
-let fsBtn = document.getElementById("fsBtn");
-let muteBtn = document.getElementById("muteBtn");
-
-let hls;
 let hideTimer;
+let hls;
+let currentStream = "";
 
-/* --- STREAM YÜKLEME (Senin çalışan model) --- */
-function loadStream(url){
-    if(hls){ hls.destroy(); hls=null; }
+// BAR GÖSTER / GİZLE
+function showControls() {
+    controls.style.opacity = 1;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        controls.style.opacity = 0;
+    }, 3000);
+}
+document.body.addEventListener("mousemove", showControls);
+document.body.addEventListener("click", showControls);
 
-    if(Hls.isSupported()){
-        hls = new Hls({
-            maxMaxBufferLength:60,
-            liveSyncDuration:4
-        });
+// YAYINI YÜKLE
+function loadStream(url) {
+    if (hls) { hls.destroy(); }
+    video.src = "";
+
+    if (Hls.isSupported()) {
+        hls = new Hls({maxMaxBufferLength:20});
         hls.loadSource(url);
         hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play();
+        });
     } else {
         video.src = url;
+        video.play();
     }
-    video.play();
 }
 
-/* MANUEL TEST İÇİN → Buraya yayınını yazabilirsin */
-loadStream("https://tv-trtspor1.medya.trt.com.tr/master.m3u8");
-
-/* BAR GİZLEME */
-function showControls(){
-  controls.classList.add("show");
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(()=>controls.classList.remove("show"), 2500);
+// JSON TAKİP
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
+        .then(r => r.json())
+        .then(d => {
+            if (d.yayin && d.yayin !== currentStream) {
+                currentStream = d.yayin;
+                loadStream(currentStream);
+            }
+        });
 }
-document.addEventListener("touchstart", showControls);
-document.addEventListener("mousemove", showControls);
+setInterval(checkStream, 3000);
+checkStream();
 
-/* SEEKBAR */
-video.addEventListener("timeupdate", ()=>{
-    if(video.duration)
-      seek.value = (video.currentTime / video.duration) * 100;
+// SEEK BAR
+video.addEventListener("timeupdate", () => {
+    if (!video.duration) return;
+    seek.value = (video.currentTime / video.duration) * 100;
 });
 
-seek.oninput = ()=>{
+seek.addEventListener("input", () => {
     video.currentTime = (seek.value / 100) * video.duration;
+});
+
+// SES
+document.getElementById("volumeBtn").onclick = () => {
+    video.muted = !video.muted;
 };
 
-/* SES */
-muteBtn.onclick = ()=>{
-  video.muted = !video.muted;
-  muteBtn.textContent = video.muted ? "🔇" : "🔊";
-};
-
-/* TAM EKRAN */
-fsBtn.onclick = ()=>{
-  if(!document.fullscreenElement)
-    video.requestFullscreen();
-  else
-    document.exitFullscreen();
+// FULLSCREEN
+document.getElementById("fsBtn").onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
 };
 </script>
 
