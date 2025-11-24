@@ -43,7 +43,7 @@
         pointer-events:auto;
     }
 
-    /* LIVE yazısı */
+    /* LIVE */
     #liveTag {
         color:white;
         font-size:15px;
@@ -61,17 +61,27 @@
         display:inline-block;
     }
 
-    /* Progress bar */
+    /* Progress */
     #progress { flex:1; margin:0 12px; }
     #progress input { width:100%; }
 
-    /* Ses + Tam ekran */
+    /* Ses & FS */
     .btn {
         font-size:28px;
         color:white;
-        margin-left:10px;
         cursor:pointer;
         user-select:none;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:35px;
+    }
+
+    /* TAM EKRAN BUTONU YENİ */
+    #fsBtn {
+        font-size:30px;
+        margin-left:8px;
+        transform:translateY(0px);
     }
 </style>
 </head>
@@ -105,24 +115,20 @@ let hls = null;
 let currentStream = "";
 let hideTimer;
 
-/* ------------------ PLAYER KONTROL ------------------ */
-
+/* ------------ ALT BAR GÖSTER / GİZLE ------------ */
 function showControls() {
     controls.style.opacity = 1;
     clearTimeout(hideTimer);
     hideTimer = setTimeout(()=> controls.style.opacity = 0, 3000);
 }
-
 document.body.onclick = showControls;
 
-/* ------------------ SES ------------------ */
-
+/* ------------ SES ------------ */
 document.getElementById("volumeBtn").onclick = () => {
     video.muted = !video.muted;
 };
 
-/* ------------------ TAM EKRAN ------------------ */
-
+/* ------------ TAM EKRAN ------------ */
 document.getElementById("fsBtn").onclick = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
@@ -131,8 +137,7 @@ document.getElementById("fsBtn").onclick = () => {
     }
 };
 
-/* ------------------ YAYIN YÜKLE ------------------ */
-
+/* ------------ YAYIN YÜKLE ------------ */
 function loadStream(url) {
     if (hls) {
         hls.destroy();
@@ -141,10 +146,8 @@ function loadStream(url) {
 
     if (Hls.isSupported()) {
         hls = new Hls({ autoStartLoad: true });
-
         hls.loadSource(url);
         hls.attachMedia(video);
-
         hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
     } else {
         video.src = url;
@@ -152,8 +155,7 @@ function loadStream(url) {
     }
 }
 
-/* ------------------ JSON KONTROL ------------------ */
-
+/* ------------ JSON KONTROL ------------ */
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
     .then(r=>r.json())
@@ -168,8 +170,7 @@ function checkStream() {
 checkStream();
 setInterval(checkStream, 3000);
 
-/* ------------------ SEEK ------------------ */
-
+/* ------------ SEEK ------------ */
 seekBar.oninput = () => {
     if (!video.duration) return;
     let pos = seekBar.value / 100;
