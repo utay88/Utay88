@@ -42,7 +42,7 @@
 <body>
 
 <div id="videoContainer">
-    <video id="player" autoplay playsinline></video>
+    <video id="player" autoplay playsinline muted></video>
 
     <div id="controls">
         <div id="liveTag">LIVE</div>
@@ -59,7 +59,7 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+const jsonURL = "kontrol.json"; // JSON dosya adı (İstersen değiştirirsin)
 
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
@@ -68,9 +68,7 @@ let hideTimer;
 let hls;
 let currentStream = "";
 
-/* ------------------------------------
-   ALT BAR OTOMATİK GİZLENME
--------------------------------------- */
+/* OTOMATİK KONTROLLER GİZLEME */
 function showControls() {
     controls.style.opacity = 1;
     clearTimeout(hideTimer);
@@ -81,9 +79,7 @@ function showControls() {
 document.body.addEventListener("mousemove", showControls);
 document.body.addEventListener("click", showControls);
 
-/* ------------------------------------
-   YAYINI YÜKLE (temiz başlangıç)
--------------------------------------- */
+/* YAYINI YÜKLE (SORUNSUZ MOD) */
 function loadStream(url) {
     try {
         if (hls) {
@@ -108,14 +104,8 @@ function loadStream(url) {
         hls.attachMedia(video);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            if (hls.levels && hls.levels.length > 0) {
-                hls.currentLevel = hls.levels.length - 1;
-            }
+            video.muted = true;
             video.play().catch(()=>{});
-        });
-
-        hls.on(Hls.Events.LEVEL_SWITCHING, () => {
-            hls.nextLevel = hls.levels.length - 1;
         });
 
     } else {
@@ -124,31 +114,21 @@ function loadStream(url) {
     }
 }
 
-/* ------------------------------------
-   JSON KONTROLÜ (1 saniyeden hızlı)
--------------------------------------- */
+/* JSON KONTROL (0.7 saniyede bir) */
 function checkStream() {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
-
-    fetch(kontrolURL + "?t=" + Date.now(), { signal: controller.signal })
+    fetch(jsonURL + "?t=" + Date.now())
         .then(r => r.json())
         .then(d => {
             if (d.yayin && d.yayin !== currentStream) {
                 currentStream = d.yayin;
                 loadStream(currentStream);
             }
-        })
-        .catch(err => {})
-        .finally(() => clearTimeout(timeout));
+        });
 }
-
-setInterval(checkStream, 800);
+setInterval(checkStream, 700);
 checkStream();
 
-/* ------------------------------------
-   SEEK BAR
--------------------------------------- */
+/* SEEK */
 video.addEventListener("timeupdate", () => {
     if (!video.duration) return;
     seek.value = (video.currentTime / video.duration) * 100;
@@ -157,16 +137,12 @@ seek.addEventListener("input", () => {
     video.currentTime = (seek.value / 100) * video.duration;
 });
 
-/* ------------------------------------
-   SES KONTROL
--------------------------------------- */
+/* SES */
 document.getElementById("volumeBtn").onclick = () => {
     video.muted = !video.muted;
 };
 
-/* ------------------------------------
-   TAM EKRAN
--------------------------------------- */
+/* TAM EKRAN */
 document.getElementById("fsBtn").onclick = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
