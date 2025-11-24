@@ -2,39 +2,14 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canlı Yayın</title>
 
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="0" />
-
-<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet"/>
 
 <style>
 body { margin:0; background:black; }
 #my-video { width:100%; height:100vh; object-fit:contain; }
-
-/* Tam ekran butonunu büyük yapalım */
-.vjs-fullscreen-control {
-    width: 55px !important;
-    height: 55px !important;
-}
-
-/* Tüm kontrol tuşlarını büyütelim */
-.vjs-control {
-    padding: 14px !important;
-    touch-action: manipulation !important;
-}
-
-/* Dokunma engellerini kaldır */
-.vjs-tech {
-    pointer-events: auto !important;
-}
-
-body, #my-video {
-    touch-action: manipulation !important;
-}
 </style>
 </head>
 
@@ -48,80 +23,26 @@ body, #my-video {
   playsinline
 ></video>
 
+<!-- VideoJS -->
 <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+
+<!-- HLS -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-// JSON link
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
 let currentStream = "";
 let hls = null;
-let dvrActive = false;
 
-// Player ayarı
 const player = videojs("my-video", {
     autoplay: true,
     controls: true,
     preload: "auto",
-    liveui: true
+    liveui: true    // ← TRT canlı + geri sarma destekler
 });
 
-// DVR destekleyip desteklemediğini algıla
-function detectDVR(manifest) {
-    if (manifest.includes("#EXT-X-PLAYLIST-TYPE:EVENT")) return true;
-    if (manifest.includes("#EXT-X-DVR")) return true;
-    if (manifest.includes("#EXT-X-MEDIA-SEQUENCE")) return true;
-    return false;
-}
-
-// Yayını yükle
-function loadStream(url) {
-    if (hls) { hls.destroy(); hls = null; }
-
-    // Önce manifesti indirip DVR olup olmadığını kontrol ediyoruz
-    fetch(url)
-    .then(r => r.text())
-    .then(manifest => {
-        dvrActive = detectDVR(manifest);
-
-        hls = new Hls({
-            autoStartLoad: true,
-            startLevel: -1   // otomatik en yüksek kalite
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(player.tech().el_);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            // En yüksek kaliteyi seç
-            let max = hls.levels.length - 1;
-            if (max >= 0) hls.currentLevel = max;
-            player.play();
-        });
-
-        // DVR yoksa, geri sarma donmasın diye LIVE edge'e dön
-        if (!dvrActive) {
-            player.on("seeking", () => {
-                if (player.liveTracker) {
-                    player.currentTime(player.liveTracker.liveCurrentTime());
-                }
-            });
-
-            player.on("waiting", () => {
-                if (player.liveTracker) {
-                    player.liveTracker.seekToLiveEdge();
-                }
-            });
-        } else {
-            // DVR varsa istendiği gibi geriye sarabilir
-            player.off("seeking");
-            player.off("waiting");
-        }
-    });
-}
-
-// JSON kontrol et
+// JSON kontrolü
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
@@ -131,10 +52,40 @@ function checkStream() {
                 loadStream(currentStream);
             }
         })
-        .catch(e => console.log("JSON okunamadı:", e));
+        .catch(() => {});
 }
 
+// Yayını yükle
+function loadStream(url) {
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
+
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 600, // 10 dk geri sarma
+        });
+
+        hls.loadSource(url);
+        hls.attachMedia(player.tech().el_);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            player.play();
+        });
+
+    } else {
+        player.src({ src: url, type: "application/x-mpegURL" });
+        player.play();
+    }
+}
+
+// İlk açılış
 checkStream();
+
+// Her 3 saniyede JSON kontrolü
 setInterval(checkStream, 3000);
 </script>
 
