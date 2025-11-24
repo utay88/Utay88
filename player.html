@@ -1,54 +1,74 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Canlı Yayın</title>
 
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/@vime/core@5/themes/default.css"
-/>
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
 
 <style>
   body { margin:0; background:black; }
-  vm-player { width:100%; height:100vh; }
+  #player { width:100%; height:100vh; }
+  .plyr__menu__container { font-size:18px; }
 </style>
 </head>
 <body>
 
-<vm-player controls autoplay>
-  <vm-hls id="source"></vm-hls>
+<video id="player" controls autoplay playsinline></video>
 
-  <vm-ui>
-      <vm-controls full-width>
-          <vm-control-group space="top">
-              <vm-playback-control></vm-playback-control>
-              <vm-volume-control></vm-volume-control>
-              <vm-settings-control></vm-settings-control>
-          </vm-control-group>
-          <vm-scrubber-control></vm-scrubber-control>
-      </vm-controls>
-  </vm-ui>
-</vm-player>
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-<script type="module">
-import 'https://unpkg.com/@vime/core@5/dist/vime/vime.esm.js';
-
+<script>
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
 let currentStream = "";
-const source = document.getElementById("source");
+
+const video = document.getElementById("player");
+const player = new Plyr(video, {
+  settings: ['quality'],
+  quality: { default: 720, forced: true, options: [1440,1080,720,480,360] }
+});
+
+let hls;
 
 function loadStream(url) {
-  source.src = url;
+  if (hls) hls.destroy();
+
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      maxBufferLength: 10,
+      startLevel: -1,
+    });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+      const levels = hls.levels.map(l => l.height).sort((a,b)=>b-a);
+
+      player.quality.options = levels;
+      player.quality.default = levels[0];
+
+      player.play();
+    });
+
+    player.on('qualitychange', (e) => {
+      const q = e.detail.quality;
+      const levelIndex = hls.levels.findIndex(l => l.height === q);
+      hls.currentLevel = levelIndex;
+    });
+
+  } else {
+    video.src = url;
+    video.play();
+  }
 }
 
 function checkStream() {
-  fetch(kontrolURL + "?t=" + Date.now())
-    .then(r => r.json())
-    .then(data => {
+  fetch(kontrolURL + "?v=" + Date.now())
+    .then(r=>r.json())
+    .then(data=>{
       if (data.yayin && data.yayin !== currentStream) {
         currentStream = data.yayin;
         loadStream(currentStream);
