@@ -7,55 +7,73 @@
 <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
 
 <style>
-body { margin: 0; background: black; }
-#my-video { width: 100%; height: 100vh; }
+    body {
+        margin: 0;
+        background: black;
+    }
 
-/* Sağ üstte dişli */
-#quality-btn {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    font-size: 34px;
-    color: white;
-    cursor: pointer;
-    z-index: 9999;
-}
+    /* Tüm player alanı */
+    #player-wrap {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+        background: black;
+        overflow: hidden;
+    }
 
-/* Kalite menüsü */
-#quality-menu {
-    position: absolute;
-    top: 60px;
-    right: 15px;
-    background: rgba(0,0,0,0.75);
-    padding: 10px;
-    border-radius: 8px;
-    min-width: 120px;
-    display: none;
-    z-index: 9999;
-}
+    #my-video {
+        width: 100%;
+        height: 100%;
+    }
 
-#quality-menu div {
-    color: white;
-    padding: 7px 5px;
-    font-size: 17px;
-    cursor: pointer;
-}
+    /* Sağ üstte dişli */
+    #quality-btn {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        font-size: 32px;
+        color: white;
+        cursor: pointer;
+        z-index: 9999;
+        user-select: none;
+    }
 
-#quality-menu div:hover {
-    background: rgba(255,255,255,0.2);
-}
+    /* Kalite menüsü */
+    #quality-menu {
+        position: absolute;
+        top: 55px;
+        right: 12px;
+        background: rgba(0,0,0,0.80);
+        padding: 10px 14px;
+        border-radius: 8px;
+        min-width: 130px;
+        display: none;
+        z-index: 9999;
+    }
+
+    #quality-menu div {
+        color: white;
+        padding: 6px 4px;
+        font-size: 17px;
+        cursor: pointer;
+    }
+
+    #quality-menu div:hover {
+        background: rgba(255,255,255,0.20);
+    }
 </style>
-
 </head>
 <body>
 
-<video id="my-video" class="video-js vjs-default-skin" autoplay controls></video>
+<div id="player-wrap">
+    <video id="my-video" class="video-js vjs-default-skin" autoplay controls></video>
 
-<!-- Dişli ikonu -->
-<div id="quality-btn">⚙</div>
+    <!-- Dişli ikonu -->
+    <div id="quality-btn">⚙</div>
 
-<!-- Kalite listesi -->
-<div id="quality-menu"></div>
+    <!-- Kalite listesi -->
+    <div id="quality-menu"></div>
+</div>
 
 <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -66,8 +84,13 @@ const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol
 let currentStream = "";
 let hlsInstance = null;
 
-var player = videojs("my-video", { autoplay: true, controls: true });
+// VideoJS başlat
+var player = videojs("my-video", {
+    autoplay: true,
+    controls: true
+});
 
+// JSON’dan yayını kontrol et
 function checkStream() {
     fetch(kontrolURL + "?v=" + Date.now())
         .then(r => r.json())
@@ -80,9 +103,14 @@ function checkStream() {
         .catch(() => {});
 }
 
+// Yayını yükle
 function loadStream(url) {
 
-    if (hlsInstance) hlsInstance.destroy();
+    // Eski HLS varsa temizle
+    if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
+    }
 
     if (Hls.isSupported()) {
         hlsInstance = new Hls({ enableWorker: true });
@@ -95,49 +123,92 @@ function loadStream(url) {
         });
 
     } else {
+        // Eski tarayıcılar için
         player.src({ src: url, type: "application/x-mpegURL" });
         player.play();
     }
 }
 
+// Kalite menüsünü oluştur
 function buildQualityMenu(levels) {
     const menu = document.getElementById("quality-menu");
     menu.innerHTML = "";
 
     if (!levels || levels.length === 0) return;
 
+    // Yüksekten düşüğe sırala (1440, 1080, 720...)
     levels.sort((a, b) => b.height - a.height);
 
     levels.forEach((lvl, index) => {
-        let label = lvl.height + "p";
-        let div = document.createElement("div");
-        div.innerText = label;
+        const label = (lvl.height || "?") + "p";
+        const div = document.createElement("div");
+        div.textContent = label;
 
         div.onclick = () => {
-            hlsInstance.currentLevel = index;
+            if (hlsInstance) {
+                hlsInstance.currentLevel = index;
+            }
             menu.style.display = "none";
         };
 
         menu.appendChild(div);
     });
 
-    let auto = document.createElement("div");
-    auto.innerText = "Otomatik";
+    // Otomatik kalite
+    const auto = document.createElement("div");
+    auto.textContent = "Otomatik";
     auto.onclick = () => {
-        hlsInstance.currentLevel = -1;
+        if (hlsInstance) {
+            hlsInstance.currentLevel = -1;
+        }
         menu.style.display = "none";
     };
     menu.appendChild(auto);
 }
 
+// Dişliye tıklayınca menüyü aç/kapat
 document.getElementById("quality-btn").onclick = () => {
     const menu = document.getElementById("quality-menu");
-    menu.style.display = menu.style.display === "block" ? "none" : "block";
+    menu.style.display = (menu.style.display === "block") ? "none" : "block";
 };
 
+// Her 3 saniyede JSON’u kontrol et
 setInterval(checkStream, 3000);
 checkStream();
 </script>
 
 </body>
 </html>
+
+
+---
+
+Şimdi yapacağın tek şey:
+
+1. GitHub’da player.html aç
+
+
+2. İçindeki HER ŞEYİ sil
+
+
+3. Yukarıdaki dosyayı komple yapıştır
+
+
+4. Commit / Save
+
+
+5. Telefonda şu linkle aç:
+
+
+
+https://utay88.github.io/Utay88/player.html?v=2
+
+Yayın oynarken bile sağ üstte ⚙ hep duracak
+
+Ekrana tıklamana gerek yok
+
+İstediğin an tıkla, çözünürlüğü değiştir, yayın kesilmeden devam et
+
+
+Sonra bana sadece şunu yaz:
+“Oldu” veya “Şu detay hoşuma gitmedi” – oradan ince ayar yaparız.
