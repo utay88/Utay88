@@ -5,152 +5,168 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canlı Yayın</title>
 
-<!-- Cache kapalı -->
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="0" />
-
-<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
-
 <style>
-body {
-    margin: 0;
-    background: black;
-}
-#my-video {
-    width: 100%;
-    height: 100vh;
-    object-fit: contain;
-    background: black;
-}
+    body { margin:0; background:black; overflow:hidden; }
+    #videoContainer {
+        width:100vw;
+        height:100vh;
+        position:relative;
+        background:black;
+    }
+    video {
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        background:black;
+    }
 
-/* İSTENMEYEN KONTROLLERİ SAKLA */
-.vjs-progress-control,
-.vjs-remaining-time,
-.vjs-current-time,
-.vjs-time-divider,
-.vjs-duration,
-.vjs-volume-panel,
-.vjs-playback-rate,
-.vjs-picture-in-picture-control,
-.vjs-seek-to-live-control {
-    display: none !important;
-}
+    /* Alt bar */
+    #controls {
+        position:absolute;
+        bottom:0;
+        left:0;
+        width:100%;
+        height:55px;
+        background:rgba(0,0,0,0.55);
+        display:flex;
+        align-items:center;
+        padding:0 12px;
+        opacity:0;
+        transition:opacity .3s;
+    }
 
-/* Control bar düzeni */
-.vjs-control-bar {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 0 8px !important;
-}
+    /* LIVE */
+    #liveTag {
+        color:white;
+        font-size:15px;
+        display:flex;
+        align-items:center;
+        margin-right:10px;
+    }
+    #liveTag::before {
+        content:"";
+        width:10px;
+        height:10px;
+        background:red;
+        border-radius:50%;
+        margin-right:6px;
+        display:inline-block;
+    }
 
-/* LIVE etiketi */
-.vjs-live-pill {
-    color: #fff;
-    background: #e53935;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    margin: 0 8px;
-}
+    /* Progress bar */
+    #progress {
+        flex:1;
+        margin:0 12px;
+    }
+    #progress input {
+        width:100%;
+    }
 
-/* Buton tıklama alanlarını büyüt */
-.vjs-control {
-    min-width: 40px !important;
-}
+    /* Buttons */
+    #volumeBtn, #fsBtn {
+        font-size:28px;
+        color:white;
+        margin-left:10px;
+        cursor:pointer;
+    }
 </style>
 </head>
 
 <body>
 
-<video
-  id="my-video"
-  class="video-js vjs-default-skin vjs-big-play-centered"
-  controls
-  autoplay
-  playsinline
-></video>
+<div id="videoContainer">
+    <video id="player" autoplay playsinline></video>
 
-<!-- VideoJS -->
-<script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <div id="controls">
+        <div id="liveTag">LIVE</div>
 
-<!-- HLS -->
+        <div id="progress">
+            <input type="range" id="seek" min="0" max="100" value="0">
+        </div>
+
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⛶</div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-// GitHub JSON
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
+let video = document.getElementById("player");
+let controls = document.getElementById("controls");
+let seek = document.getElementById("seek");
+let hideTimer;
+let hls;
 let currentStream = "";
-let hls = null;
 
-// Player
-const player = videojs("my-video", {
-    autoplay: true,
-    controls: true,
-    preload: "auto",
-    liveui: true
-});
+// BAR GÖSTER / GİZLE
+function showControls() {
+    controls.style.opacity = 1;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        controls.style.opacity = 0;
+    }, 3000);
+}
+document.body.addEventListener("mousemove", showControls);
+document.body.addEventListener("click", showControls);
 
-// Alt bara LIVE etiketi ekle
-player.ready(function () {
-    const controlBar = player.getChild('controlBar');
-    const barEl = controlBar.el();
+// YAYINI YÜKLE
+function loadStream(url) {
+    if (hls) { hls.destroy(); }
+    video.src = "";
 
-    const liveEl = document.createElement("div");
-    liveEl.className = "vjs-live-pill";
-    liveEl.textContent = "LIVE";
+    if (Hls.isSupported()) {
+        hls = new Hls({maxMaxBufferLength:20});
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play();
+        });
+    } else {
+        video.src = url;
+        video.play();
+    }
+}
 
-    // Tam ekran butonunun soluna yerleştir
-    const fsBtn = barEl.querySelector(".vjs-fullscreen-control");
-    barEl.insertBefore(liveEl, fsBtn);
-});
-
-// JSON kontrolü
+// JSON TAKİP
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
-        .then(data => {
-            if (data.yayin && data.yayin !== currentStream) {
-                currentStream = data.yayin;
+        .then(d => {
+            if (d.yayin && d.yayin !== currentStream) {
+                currentStream = d.yayin;
                 loadStream(currentStream);
             }
-        })
-        .catch(e => console.log("JSON okunamadı:", e));
-}
-
-// Yayını yükle
-function loadStream(url) {
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
-
-    if (Hls.isSupported()) {
-        hls = new Hls({
-            enableWorker: true,
-            startLevel: -1   // Otomatik, genelde en iyi kaliteye çıkar
         });
-
-        hls.loadSource(url);
-        hls.attachMedia(player.tech().el_);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            player.play();
-        });
-
-    } else {
-        // HLS desteklemeyen eski cihazlar için fallback
-        player.src({ src: url, type: "application/x-mpegURL" });
-        player.play();
-    }
 }
-
-// Başlat
-checkStream();
 setInterval(checkStream, 3000);
+checkStream();
+
+// SEEK BAR
+video.addEventListener("timeupdate", () => {
+    if (!video.duration) return;
+    seek.value = (video.currentTime / video.duration) * 100;
+});
+
+seek.addEventListener("input", () => {
+    video.currentTime = (seek.value / 100) * video.duration;
+});
+
+// SES
+document.getElementById("volumeBtn").onclick = () => {
+    video.muted = !video.muted;
+};
+
+// FULLSCREEN
+document.getElementById("fsBtn").onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+};
 </script>
 
 </body>
