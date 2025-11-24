@@ -1,104 +1,90 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Canlı Yayın</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Player</title>
 
-  <style>
+<style>
     body {
-      margin: 0;
-      background-color: #000;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    #video-container {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: #000;
+        margin: 0;
+        background: black;
+        overflow: hidden;
     }
     video {
-      width: 100%;
-      height: 100%;
-      max-height: 100vh;
-      background-color: #000;
+        width: 100vw;
+        height: 100vh;
+        background: black;
     }
-    /* Statü çubuğunu tamamen gizle */
-    #status {
-      display: none !important;
-    }
-  </style>
+</style>
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<!-- HLS.JS (gerçek ExoPlayer kadar stabil sürüm) -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
 </head>
 <body>
-  <div id="video-container">
-    <video id="video" controls playsinline></video>
-  </div>
 
-  <div id="status"></div> <!-- Artık görünmeyecek -->
+<video id="v" controls playsinline></video>
 
-  <script>
-    const JSON_URL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
-    const POLL_MS = 5000;
+<script>
+const video = document.getElementById("v");
 
-    const video = document.getElementById("video");
-    const statusEl = document.getElementById("status");
+// JSON dosyan BURADA:
+const JSON_URL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
 
-    let currentChannel = null;
-    let hls = null;
+// Kaç saniyede bir kontrol edilecek?
+const CHECK_INTERVAL = 5000;
 
-    async function fetchChannel() {
-      try {
-        const res = await fetch(JSON_URL + "?_t=" + Date.now());
-        const data = await res.json();
-        return data.channel || null;
-      } catch (e) {
-        return null;
-      }
-    }
+let currentURL = "";
 
-    function playChannel(url) {
-      if (!url) return;
+// Yayını başlat
+function startStream(url) {
+    if (!url) return;
 
-      if (hls) {
-        hls.destroy();
-        hls = null;
-      }
-
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = url;
-        video.play().catch(() => {});
-      } else if (Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-          video.play().catch(() => {});
-        });
-      }
-    }
-
-    async function init() {
-      const ch = await fetchChannel();
-      currentChannel = ch;
-      playChannel(ch);
-
-      setInterval(async () => {
-        const newCh = await fetchChannel();
-        if (newCh && newCh !== currentChannel) {
-          currentChannel = newCh;
-          playChannel(newCh);
+    if (Hls.isSupported()) {
+        if (window.hls) {
+            window.hls.destroy();
         }
-      }, POLL_MS);
+        window.hls = new Hls({
+            maxMaxBufferLength: 10,
+            enableWorker: true
+        });
+        window.hls.loadSource(url);
+        window.hls.attachMedia(video);
+        window.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play().catch(()=>{});
+        });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        video.play().catch(()=>{});
     }
+}
 
-    init();
-  </script>
+// JSON’dan link çek
+async function checkJSON() {
+    try {
+        const response = await fetch(JSON_URL + "?t=" + Date.now());
+        const data = await response.json();
+        const newURL = data.channel?.trim();
+
+        if (!newURL) return;
+
+        // Link değişmişse player’ı güncelle
+        if (newURL !== currentURL) {
+            currentURL = newURL;
+            startStream(newURL);
+        }
+
+    } catch (e) {
+        console.log("JSON okunamadı", e);
+    }
+}
+
+// İlk yükleme
+checkJSON();
+
+// Düzenli olarak kontrol et
+setInterval(checkJSON, CHECK_INTERVAL);
+</script>
+
 </body>
 </html>
