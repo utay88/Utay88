@@ -1,79 +1,121 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Canlı Yayın</title>
+  <meta charset="UTF-8" />
+  <title>Canlı Yayın</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet">
-<script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
-<style>
+  <style>
     body {
-        margin: 0;
-        background: black;
+      margin: 0;
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
     }
-    #myvideo {
-        width: 100%;
-        height: 100vh;
+    #video-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #000;
     }
-</style>
+    video {
+      width: 100%;
+      height: 100%;
+      max-height: 100vh;
+      background-color: #000;
+    }
+    #status {
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #111;
+      border-top: 1px solid #333;
+    }
+  </style>
+
+  <!-- HLS.js (m3u8 oynatmak için) -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
-
 <body>
+  <div id="video-container">
+    <video id="video" controls playsinline></video>
+  </div>
+  <div id="status">Durum: Başlatılıyor…</div>
 
-<video
-    id="myvideo"
-    class="video-js vjs-default-skin"
-    controls
-    autoplay
-    playsinline
-    webkit-playsinline>
-</video>
+  <script>
+    const JSON_URL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
+    const POLL_MS = 5000; // kaç ms’de bir aktif.json kontrol edilsin (5 sn)
 
-<script>
-// GitHub'daki kontrol dosyan
-const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
+    const video = document.getElementById("video");
+    const statusEl = document.getElementById("status");
 
-let aktifYayin = null; // mevcut yayın
-let videoEl = document.getElementById("myvideo");
+    let currentChannel = null;
+    let hls = null;
 
-// M3U8 yayını oynatma fonksiyonu
-function oynat(url) {
-    if (Hls.isSupported()) {
-        let hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(videoEl);
-        videoEl.play();
-    } else {
-        videoEl.src = url;
-        videoEl.play();
+    async function fetchChannel() {
+      try {
+        const res = await fetch(JSON_URL + "?_t=" + Date.now());
+        const data = await res.json();
+        return data.channel || null;
+      } catch (e) {
+        console.error("JSON okuma hatası:", e);
+        statusEl.textContent = "Durum: JSON okuma hatası";
+        return null;
+      }
     }
-}
 
-// JSON dosyasını sürekli kontrol et
-function kontrolEt() {
-    fetch(kontrolURL + "?t=" + Date.now()) // cache engelle
-        .then(res => res.json())
-        .then(data => {
-            let yeniYayin = data.aktif_yayin;
+    function playChannel(url) {
+      if (!url) {
+        statusEl.textContent = "Durum: Kanal URL bulunamadı";
+        return;
+      }
 
-            if (yeniYayin && yeniYayin !== aktifYayin) {
-                aktifYayin = yeniYayin;
-                oynat(aktifYayin);
-                console.log("Yeni yayın açıldı:", yeniYayin);
-            }
-        })
-        .catch(err => console.log("Kontrol hatası:", err));
-}
+      statusEl.textContent = "Durum: Yayın yükleniyor…";
 
-// Her 3 saniyede GitHub'ı kontrol et
-setInterval(kontrolEt, 3000);
+      // Daha önce Hls örneği varsa yok et
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
 
-// Sayfa açılır açılmaz kontrol
-kontrolEt();
-</script>
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        // Bazı cihazlar m3u8’i direkt oynatabiliyor
+        video.src = url;
+        video.play().catch(() => {});
+      } else if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          video.play().catch(() => {});
+        });
+      } else {
+        statusEl.textContent = "Durum: Bu cihaz HLS desteklemiyor";
+        return;
+      }
 
+      statusEl.textContent = "Durum: " + url;
+    }
+
+    async function init() {
+      const ch = await fetchChannel();
+      currentChannel = ch;
+      playChannel(ch);
+
+      // Belirli aralıklarla aktif.json kontrol et
+      setInterval(async () => {
+        const newCh = await fetchChannel();
+        if (newCh && newCh !== currentChannel) {
+          currentChannel = newCh;
+          playChannel(newCh);
+        }
+      }, POLL_MS);
+    }
+
+    init();
+  </script>
 </body>
 </html>
