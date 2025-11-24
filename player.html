@@ -24,50 +24,81 @@
 </head>
 <body>
 
-<video id="player" controls autoplay></video>
+<video id="player" controls autoplay playsinline></video>
 
 <script>
     const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
+
     let video = document.getElementById("player");
-    let hls;
-    let currentStream = "";
+    let hls = null;
+    let lastURL = "";
 
     function loadStream(url) {
+        if (!url) return;
+
+        // Videoyu durdur
+        video.pause();
+        video.src = "";
+        
+        // Eski HLS nesnesini yok et
         if (hls) {
+            hls.stopLoad();
             hls.destroy();
+            hls = null;
         }
+
+        // Yeni HLS nesnesi oluştur
         hls = new Hls({
-            maxBufferLength: 30,
-            startLevel: -1
+            maxBufferLength: 1,
+            maxMaxBufferLength: 1,
+            backBufferLength: 0,
+            lowLatencyMode: true,
+            liveSyncDuration: 1,
+            liveMaxLatencyDuration: 2,
         });
 
         hls.loadSource(url);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            video.play();
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            // EN YÜKSEK KALİTE
+            let highest = 0;
+            hls.levels.forEach((lvl, i) => {
+                if (lvl.height > hls.levels[highest].height) highest = i;
+            });
+            hls.currentLevel = highest;
+
+            video.play().catch(()=>{});
         });
     }
 
     async function checkJSON() {
         try {
-            const response = await fetch(jsonURL + "?t=" + Date.now());
+            const response = await fetch(jsonURL + "?_=" + Date.now(), {
+                cache: "no-store"
+            });
             const data = await response.json();
-            const newStream = data.channel.trim();
 
-            if (newStream !== currentStream) {
-                currentStream = newStream;
-                loadStream(newStream);
+            let newURL = (data.channel || "").trim();
+
+            // Link aynı görünse bile yenileyelim diye sonuna timestamp ekliyoruz
+            newURL = newURL + "?ts=" + Date.now();
+
+            if (newURL !== lastURL) {
+                lastURL = newURL;
+                loadStream(newURL);
             }
+
         } catch (e) {
-            console.log("JSON okunamadı:", e);
+            console.log("JSON hatası:", e);
         }
     }
 
-    // İlk oku
+    // ILK ÇALIŞTIRMA
     checkJSON();
 
-    // Her 5 saniyede JSON kontrol et
-    setInterval(checkJSON, 5000);
+    // HER 1 SANİYEDE BİR KONTROL (en hızlı)
+    setInterval(checkJSON, 1000);
 </script>
 
 </body>
