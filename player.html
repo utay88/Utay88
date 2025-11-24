@@ -6,101 +6,88 @@
 <title>Canlı Yayın</title>
 
 <style>
-    body { margin:0; background:black; overflow:hidden; }
+body { margin:0; background:black; overflow:hidden; }
 
-    #videoContainer {
-        position:fixed;
-        top:0;
-        left:0;
-        width:100vw;
-        height:100vh;
-        background:black;
-        overflow:hidden;
-    }
+#videoContainer {
+  position:fixed;
+  top:0; left:0;
+  width:100%;
+  height:100%;
+  background:black;
+}
 
-    video {
-        width:100%;
-        height:100%;
-        object-fit:contain;
-        position:absolute;
-        top:0;
-        left:0;
-    }
+#player {
+  width:100%;
+  height:100%;
+  object-fit:contain;
+}
 
-    /* ALT BAR */
-    #controls {
-        position:absolute;
-        bottom:0;
-        left:0;
-        width:100%;
-        height:55px;
-        background:rgba(0,0,0,0.55);
-        display:flex;
-        align-items:center;
-        padding:0 12px;
-        opacity:0;
-        transition:opacity .3s;
-        pointer-events:auto;
-    }
+/* ALT BAR */
+#controls {
+  position:absolute;
+  bottom:0;
+  left:0;
+  width:100%;
+  padding:8px 12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:rgba(0,0,0,0.40);
+  transition:opacity .4s;
+  opacity:0;
+}
 
-    /* LIVE */
-    #liveTag {
-        color:white;
-        font-size:15px;
-        display:flex;
-        align-items:center;
-        margin-right:10px;
-    }
-    #liveTag::before {
-        content:"";
-        width:10px;
-        height:10px;
-        background:red;
-        border-radius:50%;
-        margin-right:6px;
-        display:inline-block;
-    }
+#controls.show {
+  opacity:1;
+}
 
-    /* Progress */
-    #progress { flex:1; margin:0 12px; }
-    #progress input { width:100%; }
+.liveDot {
+  width:10px; height:10px;
+  border-radius:50%;
+  background:red;
+}
 
-    /* Ses & FS */
-    .btn {
-        font-size:28px;
-        color:white;
-        cursor:pointer;
-        user-select:none;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        width:35px;
-    }
+.liveText {
+  color:white;
+  font-size:16px;
+  font-weight:bold;
+}
 
-    /* TAM EKRAN BUTONU YENİ */
-    #fsBtn {
-        font-size:30px;
-        margin-left:8px;
-        transform:translateY(0px);
-    }
+#progress {
+  flex:0 0 75%;
+}
+
+#progress input {
+  width:100%;
+}
+
+.ctrlBtn {
+  color:white;
+  font-size:26px;
+  cursor:pointer;
+  padding:4px;
+}
 </style>
 </head>
 
 <body>
 
 <div id="videoContainer">
-    <video id="myVideo" playsinline autoplay></video>
 
-    <div id="controls">
-        <div id="liveTag">LIVE</div>
+  <video id="player" playsinline></video>
 
-        <div id="progress">
-            <input type="range" id="seekBar" min="0" max="100" value="100">
-        </div>
+  <div id="controls">
+      <div class="liveDot"></div>
+      <div class="liveText">LIVE</div>
 
-        <div id="volumeBtn" class="btn">🔊</div>
-        <div id="fsBtn" class="btn">⛶</div>
-    </div>
+      <div id="progress">
+          <input type="range" id="seek" min="0" max="100" value="0">
+      </div>
+
+      <div id="muteBtn" class="ctrlBtn">🔊</div>
+      <div id="fsBtn" class="ctrlBtn">⛶</div>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -108,79 +95,85 @@
 <script>
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
-let video = document.getElementById("myVideo");
+let video = document.getElementById("player");
 let controls = document.getElementById("controls");
-let seekBar = document.getElementById("seekBar");
-let hls = null;
-let currentStream = "";
+let seek = document.getElementById("seek");
+let fsBtn = document.getElementById("fsBtn");
+let muteBtn = document.getElementById("muteBtn");
+
+let hls;
 let hideTimer;
+let currentStream = "";
 
-/* ------------ ALT BAR GÖSTER / GİZLE ------------ */
-function showControls() {
-    controls.style.opacity = 1;
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(()=> controls.style.opacity = 0, 3000);
-}
-document.body.onclick = showControls;
-
-/* ------------ SES ------------ */
-document.getElementById("volumeBtn").onclick = () => {
-    video.muted = !video.muted;
-};
-
-/* ------------ TAM EKRAN ------------ */
-document.getElementById("fsBtn").onclick = () => {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
-};
-
-/* ------------ YAYIN YÜKLE ------------ */
-function loadStream(url) {
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
-
-    if (Hls.isSupported()) {
-        hls = new Hls({ autoStartLoad: true });
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
-    } else {
-        video.src = url;
-        video.play();
-    }
-}
-
-/* ------------ JSON KONTROL ------------ */
+/* --- JSON YAYIN KONTROLÜ --- */
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
     .then(r=>r.json())
     .then(data=>{
-        if (data.yayin && data.yayin !== currentStream) {
+        if(data.yayin && data.yayin !== currentStream){
             currentStream = data.yayin;
             loadStream(currentStream);
         }
     });
 }
 
+setInterval(checkStream, 2000);
 checkStream();
-setInterval(checkStream, 3000);
 
-/* ------------ SEEK ------------ */
-seekBar.oninput = () => {
-    if (!video.duration) return;
-    let pos = seekBar.value / 100;
-    video.currentTime = video.duration * pos;
+/* --- STREAM YÜKLEME --- */
+function loadStream(url){
+  if(hls){ hls.destroy(); hls=null; }
+
+  if(Hls.isSupported()){
+      hls = new Hls({
+          maxMaxBufferLength:60,
+          liveSyncDuration:4,
+          liveDurationInfinity:true
+      });
+
+      hls.loadSource(url);
+      hls.attachMedia(video);
+
+  } else {
+      video.src = url;
+  }
+
+  video.play();
+}
+
+/* --- KONTROLLERİ OTOMATİK SAKLA --- */
+function showControls(){
+  controls.classList.add("show");
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(()=>controls.classList.remove("show"), 3000);
+}
+
+document.addEventListener("mousemove", showControls);
+document.addEventListener("touchstart", showControls);
+
+/* --- SEEKBAR --- */
+video.addEventListener("timeupdate",()=>{
+    if(!video.duration) return;
+    seek.value = (video.currentTime / video.duration) * 100;
+});
+
+seek.addEventListener("input",()=>{
+    video.currentTime = (seek.value / 100) * video.duration;
+});
+
+/* --- SES --- */
+muteBtn.onclick = ()=>{
+  video.muted = !video.muted;
+  muteBtn.textContent = video.muted ? "🔇" : "🔊";
 };
 
-video.ontimeupdate = () => {
-    if (!video.duration) return;
-    let p = (video.currentTime / video.duration) * 100;
-    seekBar.value = p;
+/* --- TAM EKRAN --- */
+fsBtn.onclick = ()=>{
+  if(!document.fullscreenElement){
+      video.requestFullscreen();
+  } else {
+      document.exitFullscreen();
+  }
 };
 </script>
 
