@@ -1,76 +1,65 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
 <title>Canlı Yayın</title>
-
-<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body { margin:0; background:black; }
-#my-video { width:100%; height:100vh; object-fit:contain; }
+  body { margin:0; background:black; }
+  #player { width:100%; height:100vh; }
 </style>
+
+<!-- Clappr -->
+<script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+
+<!-- Çözünürlük seçici -->
+<script src="https://cdn.jsdelivr.net/npm/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
+
 </head>
 <body>
 
-<video id="my-video" class="video-js vjs-big-play-centered" controls autoplay playsinline></video>
-
-<script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@2.1.0"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-http-source-selector@1.1.7"></script>
+<div id="player"></div>
 
 <script>
-// JSON adresin
+
+// YAYINI BURADAN OKUYOR
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
-// Cache kırıcı
-function noCache(url){
-  return url + "?v=" + Date.now();
-}
-
-let currentStream = "";
-let hls = null;
-
-const player = videojs("my-video", {
-  autoplay:true,
-  controls:true,
-  preload:"auto"
-});
-
-player.ready(()=>{
-  player.httpSourceSelector();
-});
-
-function checkStream(){
-  fetch(noCache(kontrolURL))
-    .then(r=>r.json())
-    .then(data=>{
-      if(data.yayin && data.yayin !== currentStream){
-        currentStream = data.yayin;
-        loadStream(currentStream);
-      }
-    })
-    .catch(e=>console.log("JSON okunamadı",e));
-}
+let current = "";
+let player = null;
 
 function loadStream(url){
-  if(hls){ hls.destroy(); }
+    if(player) player.destroy();
 
-  if(Hls.isSupported()){
-    hls = new Hls();
-    hls.loadSource(noCache(url));
-    hls.attachMedia(player.tech().el_);
-    hls.on(Hls.Events.MANIFEST_PARSED, ()=>player.play());
-  } else {
-    player.src({src:noCache(url), type:"application/x-mpegURL"});
-    player.play();
-  }
+    player = new Clappr.Player({
+        parentId: "#player",
+        source: url,
+        autoPlay: true,
+        width: "100%",
+        height: "100%",
+        plugins: [LevelSelector],
+        levelSelectorConfig: {
+            title: "Kalite",
+            labels: { 0: "144p", 1: "240p", 2: "360p", 3: "480p", 4: "720p", 5: "1080p", 6: "1440p" }
+        }
+    });
 }
 
-checkStream();
-setInterval(checkStream, 3000);
+function check(){
+    fetch(kontrolURL + "?v=" + Date.now())
+    .then(r => r.json())
+    .then(data => {
+        if(data.yayin && data.yayin !== current){
+            current = data.yayin;
+            loadStream(current);
+        }
+    });
+}
+
+check();
+setInterval(check, 3000);
+
 </script>
 
 </body>
