@@ -1,59 +1,23 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canlı Yayın</title>
 
-<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+
+<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
 
 <style>
 body { margin:0; background:black; }
 #my-video { width:100%; height:100vh; object-fit:contain; }
-
-/* Dişli */
-#gear {
-  position:absolute;
-  top:12px;
-  right:12px;
-  width:32px;
-  height:32px;
-  font-size:30px;
-  color:white;
-  cursor:pointer;
-  z-index:9999;
-}
-
-/* Menü */
-#qualityMenu {
-  position:absolute;
-  top:55px;
-  right:12px;
-  background:rgba(0,0,0,0.75);
-  border-radius:8px;
-  padding:10px;
-  display:none;
-  z-index:9999;
-  min-width:110px;
-  color:white;
-  font-size:15px;
-}
-
-#qualityMenu div {
-  padding:7px 5px;
-  cursor:pointer;
-}
-
-#qualityMenu div:hover {
-  background:rgba(255,255,255,0.2);
-}
 </style>
 </head>
 
 <body>
-
-<div id="gear">⚙️</div>
-<div id="qualityMenu"></div>
 
 <video
   id="my-video"
@@ -71,91 +35,56 @@ const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol
 
 let currentStream = "";
 let hls = null;
-let hideTimer;
 
-// Player
 const player = videojs("my-video", {
     autoplay: true,
     controls: true,
     preload: "auto"
 });
 
-// Menü aç/kapa
-document.getElementById("gear").onclick = () => {
-    const menu = document.getElementById("qualityMenu");
-    menu.style.display = (menu.style.display === "block") ? "none" : "block";
-};
-
-// Menü gizleme fonksiyonu (3 sn sonra)
-function autoHideMenu() {
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-        document.getElementById("qualityMenu").style.display = "none";
-    }, 3000);
-}
-
-// Kalite menüsünü oluştur
-function buildMenu(levels) {
-    const menu = document.getElementById("qualityMenu");
-    menu.innerHTML = "";
-
-    // 1440p → 360p sıra olsun diye büyükten küçüğe sırala
-    levels.sort((a, b) => b.height - a.height);
-
-    levels.forEach((lvl, idx) => {
-        const div = document.createElement("div");
-        div.innerText = lvl.height + "p";
-
-        div.onclick = () => {
-            hls.currentLevel = lvl.index;
-            menu.style.display = "none";
-        };
-
-        menu.appendChild(div);
-    });
-
-    // otomatik seçenek
-    const auto = document.createElement("div");
-    auto.innerText = "Otomatik";
-    auto.onclick = () => {
-        hls.currentLevel = -1;
-        menu.style.display = "none";
-    };
-
-    menu.appendChild(auto);
-}
-
-// JSON kontrol
+// JSON kontrolü
 function checkStream() {
-    fetch(kontrolURL + "?t=" + Date.now())
-        .then(r => r.json())
-        .then(data => {
-            if (data.yayin && data.yayin !== currentStream) {
-                currentStream = data.yayin;
-                loadStream(currentStream);
-            }
-        });
+  fetch(kontrolURL + "?t=" + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      if (data.yayin && data.yayin !== currentStream) {
+        currentStream = data.yayin;
+        loadStream(currentStream);
+      }
+    })
+    .catch(e => console.log("JSON okunamadı:", e));
 }
 
-// Yayını yükle
+// Yayını yükle (her zaman en yüksek kalite seç)
 function loadStream(url) {
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
 
-    if (hls) hls.destroy();
-    hls = new Hls({ enableWorker: true });
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      autoStartLoad: true,
+      startLevel: -1          // <-- EN YÜKSEK kaliteyi seçer
+    });
 
     hls.loadSource(url);
     hls.attachMedia(player.tech().el_);
 
-    hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-        buildMenu(data.levels);
-        player.play();
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      // En yüksek kaliteyi zorla
+      let max = hls.levels.length - 1;
+      if (max >= 0) hls.currentLevel = max;
+
+      player.play();
     });
 
-    // Her kalite seçimi sonrası otomatik kapanma
-    player.on("resolutionchange", autoHideMenu);
+  } else {
+    player.src({ src: url, type: "application/x-mpegURL" });
+    player.play();
+  }
 }
 
-// Başlat
 checkStream();
 setInterval(checkStream, 3000);
 </script>
