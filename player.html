@@ -1,10 +1,7 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Custom Live Player</title>
-
 <style>
     body {
         margin: 0;
@@ -12,179 +9,129 @@
         overflow: hidden;
     }
 
-    #playerContainer {
-        position: relative;
-        width: 100vw;
-        height: 100vh;
-        background: black;
-    }
-
     video {
         width: 100%;
         height: 100%;
-        object-fit: contain;
         background: black;
     }
 
-    /* ALT BAR */
+    /* ALT KONTROL BAR */
     #controls {
         position: absolute;
         bottom: 0;
         width: 100%;
-        padding: 10px;
-        box-sizing: border-box;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: linear-gradient(transparent, rgba(0,0,0,0.7));
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity .4s ease;
-    }
-
-    .leftControls, .rightControls {
         display: flex;
         align-items: center;
         gap: 10px;
+        padding: 8px 12px;
+        background: rgba(0,0,0,0.35);
+        transition: opacity 0.4s;
+    }
+
+    #controls.hidden {
+        opacity: 0;
     }
 
     #liveDot {
-        width: 10px;
-        height: 10px;
-        background: red;
-        border-radius: 50%;
+        color: red;
+        font-size: 28px;
         margin-right: 5px;
     }
 
+    #liveText {
+        color: white;
+        font-size: 20px;
+        margin-right: 10px;
+    }
+
     #progress {
-        -webkit-appearance: none;
-        width: 60vw;
+        flex-grow: 1;
         height: 6px;
-        border-radius: 5px;
-        background: #ccc;
+        border-radius: 4px;
     }
 
-    #progress::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 16px;
-        height: 16px;
-        background: #2196F3;
-        border-radius: 50%;
+    #volume {
+        width: 40px;
+        height: 40px;
     }
 
-    #soundIcon, #fullscreenBtn {
-        width: 26px;
-        height: 26px;
-        filter: invert(100%);
-        cursor: pointer;
-        opacity: 0.9;
+    #fullscreen {
+        width: 40px;
+        height: 40px;
     }
 </style>
-</head>
-
-<body>
-
-<div id="playerContainer">
-
-    <video id="video" autoplay playsinline></video>
-
-    <div id="controls">
-        <div class="leftControls">
-            <div id="liveDot"></div>
-            <span style="color:white;font-weight:bold;">LIVE</span>
-            <input type="range" id="progress" value="0">
-        </div>
-
-        <div class="rightControls">
-            <img id="soundIcon" src="https://cdn-icons-png.flaticon.com/512/727/727240.png">
-            <img id="fullscreenBtn" src="https://cdn-icons-png.flaticon.com/512/1828/1828778.png">
-        </div>
-    </div>
-
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+
+<video id="video" autoplay playsinline></video>
+
+<div id="controls">
+    <div id="liveDot">●</div>
+    <div id="liveText">LIVE</div>
+    <input id="progress" type="range" min="0" max="100" value="0">
+    <img id="volume" src="https://i.imgur.com/ynZ8eKa.png">
+    <img id="fullscreen" src="https://i.imgur.com/0XQybjC.png">
+</div>
 
 <script>
     const video = document.getElementById("video");
-    const progress = document.getElementById("progress");
     const controls = document.getElementById("controls");
-    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const progress = document.getElementById("progress");
+    let hideTimer = null;
 
-    /* YAYIN LINKİNİ BURAYA KOYUYORSUN */
-    const streamURL = "https://tv-trtcocuk.live.trt.com.tr/master.m3u8";
+    // 🔥 **1 — ALT BAR OTOMATİK KAYBOLMA**
+    function resetHideTimer() {
+        controls.classList.remove("hidden");
 
-    /* HLS PLAYER KURULUMU */
+        if (hideTimer) clearTimeout(hideTimer);
+
+        hideTimer = setTimeout(() => {
+            controls.classList.add("hidden");
+        }, 3000); // 3 saniye sonra kaybolur
+    }
+
+    // Tıklama veya dokunma -> alt bar görünür
+    document.addEventListener("mousemove", resetHideTimer);
+    document.addEventListener("touchstart", resetHideTimer);
+    resetHideTimer();
+
+    // 🔥 **2 — HLS OTOMATİK EN YÜKSEK ÇÖZÜNÜRLÜK SABİT**
+    const url = "YAYIN_URLİNİ_BURAYA_YAZ"; // <- sadece burayı değiştiriyorsun
+
     if (Hls.isSupported()) {
         const hls = new Hls({
-            maxMaxBufferLength: 60,
-            startLevel: -1,           // EN YÜKSEK kaliteyi otomatik seç
-            capLevelToPlayerSize: true
+            maxAutoLevelCapping: -1,
+            startLevel: -1,
+            capLevelToPlayerSize: false
         });
 
-        hls.loadSource(streamURL);
+        hls.loadSource(url);
         hls.attachMedia(video);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            hls.currentLevel = hls.levels.length - 1;
-            video.play();
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            // EN YÜKSEK KALİTEYİ ZORLA
+            const max = hls.levels.length - 1;
+            hls.currentLevel = max;
         });
-
-        // Kalite dalgalanmasını azalt
-        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-            hls.nextLevel = hls.levels.length - 1;
-        });
-
-    } else {
-        video.src = streamURL;
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = url;
     }
 
-    /* ALT BAR OTOMATİK GİZLEME */
-    let hideTimer;
-
-    function showControls() {
-        controls.style.opacity = "1";
-        controls.style.pointerEvents = "auto";
-
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => {
-            controls.style.opacity = "0";
-            controls.style.pointerEvents = "none";
-        }, 3000);
-    }
-
-    document.addEventListener("mousemove", showControls);
-    document.addEventListener("click", showControls);
-    document.addEventListener("touchstart", showControls);
-
-    showControls();
-
-    /* PROGRESS BAR */
-    video.addEventListener("timeupdate", () => {
-        if (!video.seeking && video.duration) {
-            progress.value = video.currentTime;
-            progress.max = video.duration;
-        }
-    });
-
-    progress.addEventListener("input", () => {
-        video.currentTime = progress.value;
-    });
-
-    /* SES AÇ/KAPA */
-    soundIcon.addEventListener("click", () => {
+    // SES BUTONU
+    document.getElementById("volume").onclick = function() {
         video.muted = !video.muted;
-        soundIcon.style.opacity = video.muted ? "0.4" : "1";
-    });
+    };
 
-    /* TAM EKRAN */
-    fullscreenBtn.addEventListener("click", () => {
-        if (!document.fullscreenElement) {
-            playerContainer.requestFullscreen();
-        } else {
+    // FULLSCREEN
+    document.getElementById("fullscreen").onclick = function() {
+        if (document.fullscreenElement) {
             document.exitFullscreen();
+        } else {
+            video.requestFullscreen();
         }
-    });
+    };
 </script>
 
 </body>
