@@ -1,137 +1,165 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canlı Yayın</title>
+
 <style>
-    body {
-        margin: 0;
-        background: black;
-        overflow: hidden;
-    }
+    body { margin:0; background:black; overflow:hidden; }
+    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
+    video { width:100%; height:100%; object-fit:contain; background:black; }
 
-    video {
-        width: 100%;
-        height: 100%;
-        background: black;
-    }
-
-    /* ALT KONTROL BAR */
     #controls {
-        position: absolute;
-        bottom: 0;
-        width: 100%;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 8px 12px;
-        background: rgba(0,0,0,0.35);
-        transition: opacity 0.4s;
+        position:absolute; bottom:0; left:0;
+        width:100%; height:55px;
+        background:rgba(0,0,0,0.55);
+        display:flex; align-items:center;
+        padding:0 12px;
+        opacity:0; transition:opacity .3s;
+        box-sizing: border-box;
     }
 
-    #controls.hidden {
-        opacity: 0;
+    #liveTag {
+        color:white; font-size:15px; display:flex; align-items:center;
+        margin-right:10px; flex-shrink:0;
+    }
+    #liveTag::before {
+        content:""; width:10px; height:10px; background:red;
+        border-radius:50%; margin-right:6px; display:inline-block;
     }
 
-    #liveDot {
-        color: red;
-        font-size: 28px;
-        margin-right: 5px;
-    }
+    #progress { flex:1; margin:0 12px; min-width:0; }
+    #progress input { width:100%; display:block; }
 
-    #liveText {
-        color: white;
-        font-size: 20px;
-        margin-right: 10px;
-    }
-
-    #progress {
-        flex-grow: 1;
-        height: 6px;
-        border-radius: 4px;
-    }
-
-    #volume {
-        width: 40px;
-        height: 40px;
-    }
-
-    #fullscreen {
-        width: 40px;
-        height: 40px;
+    #volumeBtn, #fsBtn {
+        font-size:28px; color:white; margin-left:10px;
+        cursor:pointer; flex-shrink:0;
     }
 </style>
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
+
 <body>
 
-<video id="video" autoplay playsinline></video>
+<div id="videoContainer">
+    <video id="player" autoplay playsinline></video>
 
-<div id="controls">
-    <div id="liveDot">●</div>
-    <div id="liveText">LIVE</div>
-    <input id="progress" type="range" min="0" max="100" value="0">
-    <img id="volume" src="https://i.imgur.com/ynZ8eKa.png">
-    <img id="fullscreen" src="https://i.imgur.com/0XQybjC.png">
+    <div id="controls">
+        <div id="liveTag">LIVE</div>
+
+        <div id="progress">
+            <input type="range" id="seek" min="0" max="100" value="0">
+        </div>
+
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⤢</div>
+    </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
 <script>
-    const video = document.getElementById("video");
-    const controls = document.getElementById("controls");
-    const progress = document.getElementById("progress");
-    let hideTimer = null;
+const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
-    // 🔥 **1 — ALT BAR OTOMATİK KAYBOLMA**
-    function resetHideTimer() {
-        controls.classList.remove("hidden");
+let video = document.getElementById("player");
+let controls = document.getElementById("controls");
+let seek = document.getElementById("seek");
+let hideTimer;
+let hls;
+let currentStream = "";
 
-        if (hideTimer) clearTimeout(hideTimer);
+/* -------------------------
+   ALT BAR OTOMATİK GİZLENME
+--------------------------*/
+function showControls() {
+    controls.style.opacity = 1;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        controls.style.opacity = 0;
+    }, 3000);
+}
+document.body.addEventListener("mousemove", showControls);
+document.body.addEventListener("click", showControls);
 
-        hideTimer = setTimeout(() => {
-            controls.classList.add("hidden");
-        }, 3000); // 3 saniye sonra kaybolur
-    }
-
-    // Tıklama veya dokunma -> alt bar görünür
-    document.addEventListener("mousemove", resetHideTimer);
-    document.addEventListener("touchstart", resetHideTimer);
-    resetHideTimer();
-
-    // 🔥 **2 — HLS OTOMATİK EN YÜKSEK ÇÖZÜNÜRLÜK SABİT**
-    const url = "YAYIN_URLİNİ_BURAYA_YAZ"; // <- sadece burayı değiştiriyorsun
+/* -------------------------
+   YAYINI YÜKLE
+--------------------------*/
+function loadStream(url) {
+    if (hls) hls.destroy();
+    video.src = "";
 
     if (Hls.isSupported()) {
-        const hls = new Hls({
-            maxAutoLevelCapping: -1,
-            startLevel: -1,
-            capLevelToPlayerSize: false
+        hls = new Hls({
+            maxMaxBufferLength:20
         });
 
         hls.loadSource(url);
         hls.attachMedia(video);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            // EN YÜKSEK KALİTEYİ ZORLA
-            const max = hls.levels.length - 1;
-            hls.currentLevel = max;
+        /* EN YÜKSEK KALİTEYE SABİTLEME */
+        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+            if (data.levels && data.levels.length > 0) {
+                let highest = data.levels.length - 1;
+                hls.currentLevel = highest;   // kaliteyi kilitle
+            }
+            video.play();
         });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+
+        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
+        hls.on(Hls.Events.LEVEL_SWITCHING, function () {
+            hls.nextLevel = hls.levels.length - 1;
+        });
+
+    } else {
         video.src = url;
+        video.play();
     }
+}
 
-    // SES BUTONU
-    document.getElementById("volume").onclick = function() {
-        video.muted = !video.muted;
-    };
+/* -------------------------
+   JSON TAKİP
+--------------------------*/
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
+        .then(r => r.json())
+        .then(d => {
+            if (d.yayin && d.yayin !== currentStream) {
+                currentStream = d.yayin;
+                loadStream(currentStream);
+            }
+        });
+}
+setInterval(checkStream, 3000);
+checkStream();
 
-    // FULLSCREEN
-    document.getElementById("fullscreen").onclick = function() {
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            video.requestFullscreen();
-        }
-    };
+/* -------------------------
+   SEEK BAR
+--------------------------*/
+video.addEventListener("timeupdate", () => {
+    if (!video.duration) return;
+    seek.value = (video.currentTime / video.duration) * 100;
+});
+seek.addEventListener("input", () => {
+    video.currentTime = (seek.value / 100) * video.duration;
+});
+
+/* -------------------------
+   SES
+--------------------------*/
+document.getElementById("volumeBtn").onclick = () => {
+    video.muted = !video.muted;
+};
+
+/* -------------------------
+   TAM EKRAN
+--------------------------*/
+document.getElementById("fsBtn").onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+};
 </script>
 
 </body>
