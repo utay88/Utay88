@@ -2,9 +2,10 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canlı Yayın</title>
 
+<!-- Cache kapalı -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -13,49 +14,51 @@
 
 <style>
 body {
-    margin:0;
-    background:black;
-    padding:0;
-    overflow:hidden;
+    margin: 0;
+    background: black;
 }
-
-/* Safe Area düzeltme */
-html, body {
-    height:100%;
-    width:100%;
-    position:fixed;
-    inset:0;
-}
-
-/* Player sabit */
 #my-video {
-    width:100%;
-    height:100%;
-    object-fit:contain;
+    width: 100%;
+    height: 100vh;
+    object-fit: contain;
+    background: black;
 }
 
-/* Alt bar stabil */
+/* İSTENMEYEN KONTROLLERİ SAKLA */
+.vjs-progress-control,
+.vjs-remaining-time,
+.vjs-current-time,
+.vjs-time-divider,
+.vjs-duration,
+.vjs-volume-panel,
+.vjs-playback-rate,
+.vjs-picture-in-picture-control,
+.vjs-seek-to-live-control {
+    display: none !important;
+}
+
+/* Control bar düzeni */
 .vjs-control-bar {
-    display:flex !important;
-    justify-content:space-between !important;
-    align-items:center !important;
-    width:100% !important;
-
-    padding-left:10px !important;
-    padding-right:10px !important;
-
-    bottom:0 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0 8px !important;
 }
 
-/* Mobil tıklama düzeltme */
+/* LIVE etiketi */
+.vjs-live-pill {
+    color: #fff;
+    background: #e53935;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 0 8px;
+}
+
+/* Buton tıklama alanlarını büyüt */
 .vjs-control {
-    padding:0 5px !important;
-}
-
-/* Safe-area tam ekran düzeltme */
-.vjs-fullscreen {
-    width:100% !important;
-    height:100% !important;
+    min-width: 40px !important;
 }
 </style>
 </head>
@@ -70,33 +73,85 @@ html, body {
   playsinline
 ></video>
 
+<!-- VideoJS -->
 <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+
+<!-- HLS -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
+// GitHub JSON
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
 let currentStream = "";
 let hls = null;
 
-// PLAYER yapılandırma
+// Player
 const player = videojs("my-video", {
     autoplay: true,
     controls: true,
     preload: "auto",
-    html5: {
-        hls: {
-            overrideNative: true,
-            enableLowInitialPlaylist: true
-        }
-    }
+    liveui: true
 });
 
-// JSON değişim kontrol
+// Alt bara LIVE etiketi ekle
+player.ready(function () {
+    const controlBar = player.getChild('controlBar');
+    const barEl = controlBar.el();
+
+    const liveEl = document.createElement("div");
+    liveEl.className = "vjs-live-pill";
+    liveEl.textContent = "LIVE";
+
+    // Tam ekran butonunun soluna yerleştir
+    const fsBtn = barEl.querySelector(".vjs-fullscreen-control");
+    barEl.insertBefore(liveEl, fsBtn);
+});
+
+// JSON kontrolü
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
         .then(data => {
             if (data.yayin && data.yayin !== currentStream) {
                 currentStream = data.yayin;
-                loadStream(current
+                loadStream(currentStream);
+            }
+        })
+        .catch(e => console.log("JSON okunamadı:", e));
+}
+
+// Yayını yükle
+function loadStream(url) {
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
+
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            enableWorker: true,
+            startLevel: -1   // Otomatik, genelde en iyi kaliteye çıkar
+        });
+
+        hls.loadSource(url);
+        hls.attachMedia(player.tech().el_);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            player.play();
+        });
+
+    } else {
+        // HLS desteklemeyen eski cihazlar için fallback
+        player.src({ src: url, type: "application/x-mpegURL" });
+        player.play();
+    }
+}
+
+// Başlat
+checkStream();
+setInterval(checkStream, 3000);
+</script>
+
+</body>
+</html>
