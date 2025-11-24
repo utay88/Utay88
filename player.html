@@ -1,165 +1,128 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canlı Yayın</title>
 
 <style>
-    body { margin:0; background:black; overflow:hidden; }
-    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
-    video { width:100%; height:100%; object-fit:contain; background:black; }
+body {
+  margin:0;
+  background:black;
+  overflow:hidden;
+}
 
-    #controls {
-        position:absolute; bottom:0; left:0;
-        width:100%; height:55px;
-        background:rgba(0,0,0,0.55);
-        display:flex; align-items:center;
-        padding:0 12px;
-        opacity:0; transition:opacity .3s;
-        box-sizing: border-box;
-    }
+video {
+  width:100%;
+  height:100vh;
+  background:black;
+  object-fit:contain;
+}
 
-    #liveTag {
-        color:white; font-size:15px; display:flex; align-items:center;
-        margin-right:10px; flex-shrink:0;
-    }
-    #liveTag::before {
-        content:""; width:10px; height:10px; background:red;
-        border-radius:50%; margin-right:6px; display:inline-block;
-    }
+#controls {
+  position:absolute;
+  bottom:0;
+  width:100%;
+  height:60px;
+  background:rgba(0,0,0,0.45);
+  display:flex;
+  align-items:center;
+  padding:8px;
+  opacity:0;
+  transition:opacity .3s;
+}
 
-    #progress { flex:1; margin:0 12px; min-width:0; }
-    #progress input { width:100%; display:block; }
+#seek { width:100%; }
+#volume { font-size:28px; color:white; margin-left:10px; }
 
-    #volumeBtn, #fsBtn {
-        font-size:28px; color:white; margin-left:10px;
-        cursor:pointer; flex-shrink:0;
-    }
+#live {
+  color:red;
+  margin-right:10px;
+  font-weight:bold;
+}
 </style>
 </head>
 
 <body>
 
-<div id="videoContainer">
-    <video id="player" autoplay playsinline></video>
+<video id="player" autoplay playsinline></video>
 
-    <div id="controls">
-        <div id="liveTag">LIVE</div>
-
-        <div id="progress">
-            <input type="range" id="seek" min="0" max="100" value="0">
-        </div>
-
-        <div id="volumeBtn">🔊</div>
-        <div id="fsBtn">⛶</div>
-    </div>
+<div id="controls">
+  <div id="live">● CANLI</div>
+  <input type="range" id="seek" min="0" max="100" value="0">
+  <div id="volume">🔊</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+// JSON LİNKİN
+const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
 let seek = document.getElementById("seek");
-let hideTimer;
-let hls;
-let currentStream = "";
+let hls = null;
 
-/* -------------------------
-   ALT BAR OTOMATİK GİZLENME
---------------------------*/
-function showControls() {
-    controls.style.opacity = 1;
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-        controls.style.opacity = 0;
-    }, 3000);
+// ✔ Kontrolleri otomatik gizle
+let hideTimer;
+function showControls(){
+  controls.style.opacity = 1;
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(()=>{ controls.style.opacity = 0; }, 2000);
 }
 document.body.addEventListener("mousemove", showControls);
-document.body.addEventListener("click", showControls);
 
-/* -------------------------
-   YAYINI YÜKLE
---------------------------*/
-function loadStream(url) {
-    if (hls) hls.destroy();
-    video.src = "";
-
-    if (Hls.isSupported()) {
-        hls = new Hls({
-            maxMaxBufferLength:20
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(video);
-
-        /* EN YÜKSEK KALİTEYE SABİTLEME */
-        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-            if (data.levels && data.levels.length > 0) {
-                let highest = data.levels.length - 1;
-                hls.currentLevel = highest;   // kaliteyi kilitle
-            }
-            video.play();
-        });
-
-        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
-        hls.on(Hls.Events.LEVEL_SWITCHING, function () {
-            hls.nextLevel = hls.levels.length - 1;
-        });
-
-    } else {
-        video.src = url;
-        video.play();
+// ✔ JSON oku ve yayını başlat
+async function loadJSON(){
+  try {
+    let res = await fetch(kontrolURL + "?t=" + Date.now());
+    let data = await res.json();
+    if(data.channel){
+      loadStream(data.channel);
     }
+  } catch(e){
+    console.log("JSON okunamadı:",e);
+  }
 }
 
-/* -------------------------
-   JSON TAKİP
---------------------------*/
-function checkStream() {
-    fetch(kontrolURL + "?t=" + Date.now())
-        .then(r => r.json())
-        .then(d => {
-            if (d.yayin && d.yayin !== currentStream) {
-                currentStream = d.yayin;
-                loadStream(currentStream);
-            }
-        });
+// ✔ Yayını yükle
+function loadStream(url){
+  if(hls) {
+    hls.destroy();
+    hls = null;
+  }
+
+  if(Hls.isSupported()){
+    hls = new Hls({
+      maxMaxBufferLength: 2
+    });
+
+    hls.loadSource(url);
+    hls.attachMedia(video);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, function(event, data){
+      video.play();
+    });
+
+  } else {
+    video.src = url;
+    video.play();
+  }
 }
-setInterval(checkStream, 3000);
-checkStream();
 
-/* -------------------------
-   SEEK BAR
---------------------------*/
-video.addEventListener("timeupdate", () => {
-    if (!video.duration) return;
-    seek.value = (video.currentTime / video.duration) * 100;
-});
-seek.addEventListener("input", () => {
-    video.currentTime = (seek.value / 100) * video.duration;
+// ✔ Seek çubuğu
+seek.addEventListener("input", ()=>{
+  if(video.duration){
+    video.currentTime = video.duration * (seek.value / 100);
+  }
 });
 
-/* -------------------------
-   SES
---------------------------*/
-document.getElementById("volumeBtn").onclick = () => {
-    video.muted = !video.muted;
-};
+// ✔ Otomatik güncelleme (5 saniyede bir JSON kontrol)
+setInterval(loadJSON, 5000);
 
-/* -------------------------
-   TAM EKRAN
---------------------------*/
-document.getElementById("fsBtn").onclick = () => {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
-};
+// ✔ İlk açılışta JSON yükle
+loadJSON();
 </script>
 
 </body>
