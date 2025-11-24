@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 <title>Canlı Yayın</title>
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
@@ -12,29 +12,50 @@
 <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
 
 <style>
-body { margin:0; background:black; }
-#my-video { width:100%; height:100vh; object-fit:contain; }
+body {
+    margin:0;
+    background:black;
+    padding:0;
+    overflow:hidden;
+}
 
-/* ALT BAR DÜZELTME */
+/* Safe Area düzeltme */
+html, body {
+    height:100%;
+    width:100%;
+    position:fixed;
+    inset:0;
+}
+
+/* Player sabit */
+#my-video {
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+
+/* Alt bar stabil */
 .vjs-control-bar {
-    justify-content: space-between !important;
-    display: flex !important;
-    width: 100% !important;
+    display:flex !important;
+    justify-content:space-between !important;
+    align-items:center !important;
+    width:100% !important;
+
+    padding-left:10px !important;
+    padding-right:10px !important;
+
+    bottom:0 !important;
 }
 
-/* Buton sıkışmasını engelle */
+/* Mobil tıklama düzeltme */
 .vjs-control {
-    flex: 0 0 auto !important;
+    padding:0 5px !important;
 }
 
-/* Alt bar görünürlüğü düzeltme */
-.video-js .vjs-control-bar {
-    opacity: 1 !important;
-}
-
-/* Mobil tıklanabilirlik düzeltme */
-.vjs-button > .vjs-icon-placeholder {
-    font-size: 18px !important;
+/* Safe-area tam ekran düzeltme */
+.vjs-fullscreen {
+    width:100% !important;
+    height:100% !important;
 }
 </style>
 </head>
@@ -58,63 +79,24 @@ const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol
 let currentStream = "";
 let hls = null;
 
-// PLAYER
+// PLAYER yapılandırma
 const player = videojs("my-video", {
     autoplay: true,
     controls: true,
     preload: "auto",
     html5: {
         hls: {
-            overrideNative: true, 
+            overrideNative: true,
             enableLowInitialPlaylist: true
         }
     }
 });
 
-// JSON kontrolü
+// JSON değişim kontrol
 function checkStream() {
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
         .then(data => {
             if (data.yayin && data.yayin !== currentStream) {
                 currentStream = data.yayin;
-                loadStream(currentStream);
-            }
-        })
-        .catch(e => console.log("JSON okunamadı:", e));
-}
-
-// YAYINI YÜKLE
-function loadStream(url) {
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
-
-    if (Hls.isSupported()) {
-        hls = new Hls({
-            enableWorker: true,
-            autoStartLoad: true,
-            startLevel: -1,  // EN YÜKSEK KALİTE
-            capLevelToPlayerSize: false
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(player.tech().el_);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            player.play();
-        });
-
-    } else {
-        player.src({ src: url, type: "application/x-mpegURL" });
-        player.play();
-    }
-}
-
-checkStream();
-setInterval(checkStream, 3000);
-</script>
-
-</body>
-</html>
+                loadStream(current
