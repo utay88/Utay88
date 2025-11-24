@@ -16,42 +16,79 @@
         height: 100vh;
         background: black;
     }
+    #qualityMenu {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        z-index: 9999;
+    }
+    #qualityList {
+        position: absolute;
+        top: 45px;
+        right: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 10px;
+        border-radius: 6px;
+        display: none;
+        z-index: 9999;
+    }
+    #qualityList div {
+        padding: 6px;
+        cursor: pointer;
+        border-bottom: 1px solid #444;
+    }
+    #qualityList div:last-child {
+        border-bottom: none;
+    }
+    #qualityList div:hover {
+        background: #333;
+    }
 </style>
 
-<!-- HLS.JS (gerçek ExoPlayer kadar stabil sürüm) -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
 </head>
 <body>
 
 <video id="v" controls playsinline></video>
 
+<div id="qualityMenu">Kalite</div>
+<div id="qualityList"></div>
+
 <script>
 const video = document.getElementById("v");
 
-// JSON dosyan BURADA:
 const JSON_URL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
-
-// Kaç saniyede bir kontrol edilecek?
 const CHECK_INTERVAL = 5000;
 
 let currentURL = "";
+let hls = null;
 
-// Yayını başlat
+// Player başlatma
 function startStream(url) {
     if (!url) return;
 
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
+
     if (Hls.isSupported()) {
-        if (window.hls) {
-            window.hls.destroy();
-        }
-        window.hls = new Hls({
+        hls = new Hls({
             maxMaxBufferLength: 10,
             enableWorker: true
         });
-        window.hls.loadSource(url);
-        window.hls.attachMedia(video);
-        window.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play().catch(()=>{});
+            buildQualityMenu();
         });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
@@ -68,7 +105,6 @@ async function checkJSON() {
 
         if (!newURL) return;
 
-        // Link değişmişse player’ı güncelle
         if (newURL !== currentURL) {
             currentURL = newURL;
             startStream(newURL);
@@ -82,8 +118,49 @@ async function checkJSON() {
 // İlk yükleme
 checkJSON();
 
-// Düzenli olarak kontrol et
+// Düzenli kontrol
 setInterval(checkJSON, CHECK_INTERVAL);
+
+
+// =============== KALİTE MENÜSÜ =====================
+
+function buildQualityMenu() {
+    if (!hls) return;
+
+    const qualityList = document.getElementById("qualityList");
+    qualityList.innerHTML = "";
+
+    const levels = hls.levels;
+
+    if (!levels || levels.length === 0) return;
+
+    // AUTO seçeneği
+    const autoDiv = document.createElement("div");
+    autoDiv.textContent = "Otomatik";
+    autoDiv.onclick = () => {
+        hls.currentLevel = -1;
+        qualityList.style.display = "none";
+    };
+    qualityList.appendChild(autoDiv);
+
+    // Çözünürlükler
+    levels.forEach((level, index) => {
+        const div = document.createElement("div");
+        div.textContent = level.height + "p";
+        div.onclick = () => {
+            hls.currentLevel = index;
+            qualityList.style.display = "none";
+        };
+        qualityList.appendChild(div);
+    });
+}
+
+// Menü aç/kapa
+document.getElementById("qualityMenu").onclick = () => {
+    const list = document.getElementById("qualityList");
+    list.style.display = list.style.display === "block" ? "none" : "block";
+};
+
 </script>
 
 </body>
