@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="utf-8" />
+<meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canlı Yayın</title>
 
@@ -14,69 +14,61 @@ body { margin:0; background:black; }
 </head>
 <body>
 
-<video
-  id="my-video"
-  class="video-js vjs-big-play-centered"
-  controls
-  autoplay
-  playsinline
-></video>
+<video id="my-video" class="video-js vjs-big-play-centered" controls autoplay playsinline></video>
 
 <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@2.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-http-source-selector@1.1.7/dist/videojs-http-source-selector.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@2.1.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-http-source-selector@1.1.7"></script>
 
 <script>
-// JSON ADRESİN
+// JSON adresin
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+
+// Cache kırıcı
+function noCache(url){
+  return url + "?v=" + Date.now();
+}
 
 let currentStream = "";
 let hls = null;
 
-// PLAYER
 const player = videojs("my-video", {
-  autoplay: true,
-  controls: true
+  autoplay:true,
+  controls:true,
+  preload:"auto"
 });
 
-// ÇÖZÜNÜRLÜK BUTONU OTOMATİK EKLE
-player.ready(function() {
+player.ready(()=>{
   player.httpSourceSelector();
 });
 
-// JSON OKUYUP YAYINI DEĞİŞTİR
-function checkStream() {
-  fetch(kontrolURL + "?x=" + Date.now())
-    .then(r => r.json())
-    .then(data => {
-      if (!data.yayin) return;
-
-      if (data.yayin !== currentStream) {
+function checkStream(){
+  fetch(noCache(kontrolURL))
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.yayin && data.yayin !== currentStream){
         currentStream = data.yayin;
         loadStream(currentStream);
       }
-    });
+    })
+    .catch(e=>console.log("JSON okunamadı",e));
 }
 
-// YAYINI PLAYER'A YÜKLE
-function loadStream(url) {
-  if (hls) hls.destroy();
+function loadStream(url){
+  if(hls){ hls.destroy(); }
 
-  if (Hls.isSupported()) {
+  if(Hls.isSupported()){
     hls = new Hls();
-    hls.loadSource(url);
+    hls.loadSource(noCache(url));
     hls.attachMedia(player.tech().el_);
-    hls.on(Hls.Events.MANIFEST_PARSED, function () {
-      player.play();
-    });
+    hls.on(Hls.Events.MANIFEST_PARSED, ()=>player.play());
   } else {
-    player.src({ src:url, type:"application/x-mpegURL" });
+    player.src({src:noCache(url), type:"application/x-mpegURL"});
     player.play();
   }
 }
 
-// BAŞLAT
 checkStream();
 setInterval(checkStream, 3000);
 </script>
