@@ -1,136 +1,190 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Canlı Yayın</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Custom Live Player</title>
 
 <style>
-    body { margin:0; background:black; overflow:hidden; }
-    #videoContainer {
-        width:100vw;
-        height:100vh;
-        position:relative;
-        background:black;
+    body {
+        margin: 0;
+        background: black;
+        overflow: hidden;
     }
+
+    #playerContainer {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        background: black;
+    }
+
     video {
-        width:100%;
-        height:100%;
-        object-fit:contain;
-        background:black;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: black;
     }
+
+    /* ALT BAR */
     #controls {
-        position:absolute;
-        bottom:0;
-        width:100%;
-        height:55px;
-        background:rgba(0,0,0,0.55);
-        display:flex;
-        align-items:center;
-        padding:0 12px;
-        box-sizing:border-box;
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: linear-gradient(transparent, rgba(0,0,0,0.7));
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .4s ease;
+    }
+
+    .leftControls, .rightControls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
 
     #liveDot {
-        width:10px;
-        height:10px;
-        background:red;
-        border-radius:50%;
-        margin-right:6px;
+        width: 10px;
+        height: 10px;
+        background: red;
+        border-radius: 50%;
+        margin-right: 5px;
     }
 
-    #liveText {
-        color:white;
-        font-size:17px;
-        margin-right:12px;
+    #progress {
+        -webkit-appearance: none;
+        width: 60vw;
+        height: 6px;
+        border-radius: 5px;
+        background: #ccc;
     }
 
-    #seekBar {
-        flex:1;
-        margin:0 12px;
-        height:6px;
+    #progress::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        background: #2196F3;
+        border-radius: 50%;
     }
 
-    #volumeBtn, #fsBtn {
-        color:white;
-        font-size:25px;
-        margin-left:14px;
-        user-select:none;
+    #soundIcon, #fullscreenBtn {
+        width: 26px;
+        height: 26px;
+        filter: invert(100%);
+        cursor: pointer;
+        opacity: 0.9;
     }
 </style>
 </head>
 
 <body>
 
-<div id="videoContainer">
-    <video id="video" controlslist="nodownload noremoteplayback"></video>
+<div id="playerContainer">
+
+    <video id="video" autoplay playsinline></video>
 
     <div id="controls">
-        <div id="liveDot"></div>
-        <div id="liveText">LIVE</div>
-        <input type="range" id="seekBar" min="0" max="100" value="100">
-        <div id="volumeBtn">🔊</div>
-        <div id="fsBtn">⛶</div>
+        <div class="leftControls">
+            <div id="liveDot"></div>
+            <span style="color:white;font-weight:bold;">LIVE</span>
+            <input type="range" id="progress" value="0">
+        </div>
+
+        <div class="rightControls">
+            <img id="soundIcon" src="https://cdn-icons-png.flaticon.com/512/727/727240.png">
+            <img id="fullscreenBtn" src="https://cdn-icons-png.flaticon.com/512/1828/1828778.png">
+        </div>
     </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
 <script>
-const video = document.getElementById("video");
-const seekBar = document.getElementById("seekBar");
-const volumeBtn = document.getElementById("volumeBtn");
+    const video = document.getElementById("video");
+    const progress = document.getElementById("progress");
+    const controls = document.getElementById("controls");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
 
-const streamURL = "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8";
+    /* YAYIN LINKİNİ BURAYA KOYUYORSUN */
+    const streamURL = "https://tv-trtcocuk.live.trt.com.tr/master.m3u8";
 
-if (Hls.isSupported()) {
-    const hls = new Hls({
-        maxAutoLevel: 0,
-        startLevel: -1
-    });
+    /* HLS PLAYER KURULUMU */
+    if (Hls.isSupported()) {
+        const hls = new Hls({
+            maxMaxBufferLength: 60,
+            startLevel: -1,           // EN YÜKSEK kaliteyi otomatik seç
+            capLevelToPlayerSize: true
+        });
 
-    hls.loadSource(streamURL);
-    hls.attachMedia(video);
+        hls.loadSource(streamURL);
+        hls.attachMedia(video);
 
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // *** DAİMA EN YÜKSEK KALİTE SEÇİLSİN ***
-        const maxQ = hls.levels.length - 1;
-        hls.currentLevel = maxQ;
-        hls.loadLevel = maxQ;
-        hls.nextLevel = maxQ;
-        hls.autoLevelEnabled = false;
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            hls.currentLevel = hls.levels.length - 1;
+            video.play();
+        });
 
-        video.play();
-    });
+        // Kalite dalgalanmasını azalt
+        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+            hls.nextLevel = hls.levels.length - 1;
+        });
 
-} else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = streamURL;
-}
-
-// SEEK BAR sabitte kalsın
-seekBar.addEventListener("input", () => {
-    const duration = video.duration || 1;
-    video.currentTime = (seekBar.value / 100) * duration;
-});
-
-video.addEventListener("timeupdate", () => {
-    const duration = video.duration || 1;
-    seekBar.value = (video.currentTime / duration) * 100;
-});
-
-// SES
-volumeBtn.onclick = () => {
-    video.muted = !video.muted;
-    volumeBtn.textContent = video.muted ? "🔈" : "🔊";
-};
-
-// TAM EKRAN
-document.getElementById("fsBtn").onclick = () => {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
     } else {
-        document.exitFullscreen();
+        video.src = streamURL;
     }
-};
+
+    /* ALT BAR OTOMATİK GİZLEME */
+    let hideTimer;
+
+    function showControls() {
+        controls.style.opacity = "1";
+        controls.style.pointerEvents = "auto";
+
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+            controls.style.opacity = "0";
+            controls.style.pointerEvents = "none";
+        }, 3000);
+    }
+
+    document.addEventListener("mousemove", showControls);
+    document.addEventListener("click", showControls);
+    document.addEventListener("touchstart", showControls);
+
+    showControls();
+
+    /* PROGRESS BAR */
+    video.addEventListener("timeupdate", () => {
+        if (!video.seeking && video.duration) {
+            progress.value = video.currentTime;
+            progress.max = video.duration;
+        }
+    });
+
+    progress.addEventListener("input", () => {
+        video.currentTime = progress.value;
+    });
+
+    /* SES AÇ/KAPA */
+    soundIcon.addEventListener("click", () => {
+        video.muted = !video.muted;
+        soundIcon.style.opacity = video.muted ? "0.4" : "1";
+    });
+
+    /* TAM EKRAN */
+    fullscreenBtn.addEventListener("click", () => {
+        if (!document.fullscreenElement) {
+            playerContainer.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    });
 </script>
 
 </body>
