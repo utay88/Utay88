@@ -1,27 +1,166 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Redirecting...</title>
-<script>
-async function load() {
-    try {
-        const res = await fetch("https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json?t=" + Date.now());
-        const data = await res.json();
-        const url = data.channel;
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canlı Yayın</title>
 
-        if (url) {
-            window.location.href = url; // TELEFONUN KENDİ PLAYERINI AÇAR
-        } else {
-            document.body.innerHTML = "Hata: JSON içinde channel bulunamadı.";
-        }
-    } catch (e) {
-        document.body.innerHTML = "JSON okunamadı: " + e;
+<style>
+    body { margin:0; background:black; overflow:hidden; }
+    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
+    video { width:100%; height:100%; object-fit:contain; background:black; }
+
+    #controls {
+        position:absolute; bottom:0; left:0;
+        width:100%; height:55px;
+        background:rgba(0,0,0,0.55);
+        display:flex; align-items:center;
+        padding:0 12px;
+        opacity:0; transition:opacity .3s;
+        box-sizing: border-box;
+    }
+
+    #liveTag {
+        color:white; font-size:15px; display:flex; align-items:center;
+        margin-right:10px; flex-shrink:0;
+    }
+    #liveTag::before {
+        content:""; width:10px; height:10px; background:red;
+        border-radius:50%; margin-right:6px; display:inline-block;
+    }
+
+    #progress { flex:1; margin:0 12px; min-width:0; }
+    #progress input { width:100%; display:block; }
+
+    #volumeBtn, #fsBtn {
+        font-size:28px; color:white; margin-left:10px;
+        cursor:pointer; flex-shrink:0;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="videoContainer">
+    <video id="player" autoplay playsinline></video>
+
+    <div id="controls">
+        <div id="liveTag">LIVE</div>
+
+        <div id="progress">
+            <input type="range" id="seek" min="0" max="100" value="0">
+        </div>
+
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⛶</div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<script>
+const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+
+let video = document.getElementById("player");
+let controls = document.getElementById("controls");
+let seek = document.getElementById("seek");
+let hideTimer;
+let hls;
+let currentStream = "";
+
+/* -------------------------
+   ALT BAR OTOMATİK GİZLENME
+--------------------------*/
+function showControls() {
+    controls.style.opacity = 1;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        controls.style.opacity = 0;
+    }, 3000);
+}
+document.body.addEventListener("mousemove", showControls);
+document.body.addEventListener("click", showControls);
+
+/* -------------------------
+   YAYINI YÜKLE
+--------------------------*/
+function loadStream(url) {
+    if (hls) hls.destroy();
+    video.src = "";
+
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            maxMaxBufferLength:20
+        });
+
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        /* EN YÜKSEK KALİTEYE SABİTLEME */
+        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+            if (data.levels && data.levels.length > 0) {
+                let highest = data.levels.length - 1;
+                hls.currentLevel = highest;   // kaliteyi kilitle
+            }
+            video.play();
+        });
+
+        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
+        hls.on(Hls.Events.LEVEL_SWITCHING, function () {
+            hls.nextLevel = hls.levels.length - 1;
+        });
+
+    } else {
+        video.src = url;
+        video.play();
     }
 }
+
+/* -------------------------
+   JSON TAKİP
+--------------------------*/
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
+        .then(r => r.json())
+        .then(d => {
+            if (d.yayin && d.yayin !== currentStream) {
+                currentStream = d.yayin;
+                loadStream(currentStream);
+            }
+        });
+}
+setInterval(checkStream, 3000);
+checkStream();
+
+/* -------------------------
+   SEEK BAR
+--------------------------*/
+video.addEventListener("timeupdate", () => {
+    if (!video.duration) return;
+    seek.value = (video.currentTime / video.duration) * 100;
+});
+seek.addEventListener("input", () => {
+    video.currentTime = (seek.value / 100) * video.duration;
+});
+
+/* -------------------------
+   SES
+--------------------------*/
+document.getElementById("volumeBtn").onclick = () => {
+    video.muted = !video.muted;
+};
+
+/* -------------------------
+   TAM EKRAN
+--------------------------*/
+document.getElementById("fsBtn").onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+};
 </script>
-</head>
-<body onload="load()">
-Redirecting...
+
 </body>
 </html>
