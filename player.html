@@ -1,91 +1,165 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>TV Player</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canlı Yayın</title>
 
 <style>
-body {margin:0;padding:0;background:#000;overflow:hidden;}
-#player {width:100vw;height:100vh;position:fixed;top:0;left:0;}
+    body { margin:0; background:black; overflow:hidden; }
+    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
+    video { width:100%; height:100%; object-fit:contain; background:black; }
+
+    #controls {
+        position:absolute; bottom:0; left:0;
+        width:100%; height:55px;
+        background:rgba(0,0,0,0.55);
+        display:flex; align-items:center;
+        padding:0 12px;
+        opacity:0; transition:opacity .3s;
+        box-sizing: border-box;
+    }
+
+    #liveTag {
+        color:white; font-size:15px; display:flex; align-items:center;
+        margin-right:10px; flex-shrink:0;
+    }
+    #liveTag::before {
+        content:""; width:10px; height:10px; background:red;
+        border-radius:50%; margin-right:6px; display:inline-block;
+    }
+
+    #progress { flex:1; margin:0 12px; min-width:0; }
+    #progress input { width:100%; display:block; }
+
+    #volumeBtn, #fsBtn {
+        font-size:28px; color:white; margin-left:10px;
+        cursor:pointer; flex-shrink:0;
+    }
 </style>
-
-<script src="https://cdn.jsdelivr.net/npm/@clappr/player@latest/dist/clappr.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
-
 </head>
+
 <body>
 
-<div id="player"></div>
+<div id="videoContainer">
+    <video id="player" autoplay playsinline></video>
+
+    <div id="controls">
+        <div id="liveTag">LIVE</div>
+
+        <div id="progress">
+            <input type="range" id="seek" min="0" max="100" value="0">
+        </div>
+
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⛶</div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
+const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
-const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
+let video = document.getElementById("player");
+let controls = document.getElementById("controls");
+let seek = document.getElementById("seek");
+let hideTimer;
+let hls;
+let currentStream = "";
 
+/* -------------------------
+   ALT BAR OTOMATİK GİZLENME
+--------------------------*/
+function showControls() {
+    controls.style.opacity = 1;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        controls.style.opacity = 0;
+    }, 3000);
+}
+document.body.addEventListener("mousemove", showControls);
+document.body.addEventListener("click", showControls);
 
-/* Çözünürlük düzeltici */
-function fixedQualityLabel(level) {
-    if (level && level.height) return level.height + "p";
+/* -------------------------
+   YAYINI YÜKLE
+--------------------------*/
+function loadStream(url) {
+    if (hls) hls.destroy();
+    video.src = "";
 
-    const index = level?.index ?? 0;
-    const map = {
-        0: "360p",
-        1: "480p",
-        2: "720p",
-        3: "1080p",
-        4: "1440p"
-    };
-    return map[index] || "Otomatik";
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            maxMaxBufferLength:20
+        });
+
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        /* EN YÜKSEK KALİTEYE SABİTLEME */
+        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+            if (data.levels && data.levels.length > 0) {
+                let highest = data.levels.length - 1;
+                hls.currentLevel = highest;   // kaliteyi kilitle
+            }
+            video.play();
+        });
+
+        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
+        hls.on(Hls.Events.LEVEL_SWITCHING, function () {
+            hls.nextLevel = hls.levels.length - 1;
+        });
+
+    } else {
+        video.src = url;
+        video.play();
+    }
 }
 
-
-let player;
-
-
-/* Player başlatma */
-function startPlayer(source) {
-    player = new Clappr.Player({
-        source: source,
-        parentId: "#player",
-        autoPlay: true,
-        mute: true,               // AUTOPLAY İÇİN GEREKLİ
-        height: "100%",
-        width: "100%",
-        plugins: [LevelSelector],
-        levelSelectorConfig: {
-            title: "Çözünürlük",
-            labelCallback: fixedQualityLabel
-        },
-        playback: {
-            autoplay: true,
-            playInline: true
-        }
-    });
-
-    // 1 saniye sonra sesi aç
-    setTimeout(() => player.setVolume(100), 1200);
-}
-
-
-/* JSON'u oku ve yayını güncelle */
-function loadStream() {
-    fetch(jsonURL + "?t=" + Date.now())   // CACHE KAPALI
+/* -------------------------
+   JSON TAKİP
+--------------------------*/
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
-        .then(data => {
-            if (!player) {
-                startPlayer(data.channel);
-            } else {
-                // Yayın değiştiyse hemen güncelle
-                player.configure({ source: data.channel });
+        .then(d => {
+            if (d.yayin && d.yayin !== currentStream) {
+                currentStream = d.yayin;
+                loadStream(currentStream);
             }
         });
 }
+setInterval(checkStream, 3000);
+checkStream();
 
-/* İlk yükleme */
-loadStream();
+/* -------------------------
+   SEEK BAR
+--------------------------*/
+video.addEventListener("timeupdate", () => {
+    if (!video.duration) return;
+    seek.value = (video.currentTime / video.duration) * 100;
+});
+seek.addEventListener("input", () => {
+    video.currentTime = (seek.value / 100) * video.duration;
+});
 
-/* Her 5 saniyede bir yayın değişti mi kontrol et */
-setInterval(loadStream, 5000);
+/* -------------------------
+   SES
+--------------------------*/
+document.getElementById("volumeBtn").onclick = () => {
+    video.muted = !video.muted;
+};
 
+/* -------------------------
+   TAM EKRAN
+--------------------------*/
+document.getElementById("fsBtn").onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+};
 </script>
 
 </body>
