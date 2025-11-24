@@ -5,25 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canlı Yayın</title>
 
-<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+
+<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
 
 <style>
 body { margin:0; background:black; }
 #my-video { width:100%; height:100vh; object-fit:contain; }
 
-/* SEEK BAR TAMAMEN KAPALI */
-.vjs-progress-control {
-    display: none !important;
+/* ALT BAR DÜZELTME */
+.vjs-control-bar {
+    justify-content: space-between !important;
+    display: flex !important;
+    width: 100% !important;
 }
 
-/* Tam ekran tuşu kolay tıklansın */
-.vjs-fullscreen-control {
-    width: 55px !important;
-    height: 55px !important;
-}
-
+/* Buton sıkışmasını engelle */
 .vjs-control {
-    padding: 14px !important;
+    flex: 0 0 auto !important;
+}
+
+/* Alt bar görünürlüğü düzeltme */
+.video-js .vjs-control-bar {
+    opacity: 1 !important;
+}
+
+/* Mobil tıklanabilirlik düzeltme */
+.vjs-button > .vjs-icon-placeholder {
+    font-size: 18px !important;
 }
 </style>
 </head>
@@ -47,11 +58,17 @@ const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol
 let currentStream = "";
 let hls = null;
 
+// PLAYER
 const player = videojs("my-video", {
     autoplay: true,
     controls: true,
     preload: "auto",
-    liveui: false   // timeline kapalı mod
+    html5: {
+        hls: {
+            overrideNative: true, 
+            enableLowInitialPlaylist: true
+        }
+    }
 });
 
 // JSON kontrolü
@@ -63,10 +80,11 @@ function checkStream() {
                 currentStream = data.yayin;
                 loadStream(currentStream);
             }
-        });
+        })
+        .catch(e => console.log("JSON okunamadı:", e));
 }
 
-// YAYINI YÜKLE → HER ZAMAN EN YÜKSEK KALİTE
+// YAYINI YÜKLE
 function loadStream(url) {
     if (hls) {
         hls.destroy();
@@ -76,20 +94,20 @@ function loadStream(url) {
     if (Hls.isSupported()) {
         hls = new Hls({
             enableWorker: true,
-            startLevel: -1   // otomatik en yüksek kalite
+            autoStartLoad: true,
+            startLevel: -1,  // EN YÜKSEK KALİTE
+            capLevelToPlayerSize: false
         });
 
         hls.loadSource(url);
         hls.attachMedia(player.tech().el_);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            let max = hls.levels.length - 1;
-            if (max >= 0) hls.currentLevel = max;
             player.play();
         });
 
     } else {
-        player.src({ src:url, type:"application/x-mpegURL" });
+        player.src({ src: url, type: "application/x-mpegURL" });
         player.play();
     }
 }
