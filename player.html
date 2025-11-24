@@ -7,20 +7,27 @@
 
 <style>
     body { margin:0; background:black; overflow:hidden; }
+
     #videoContainer {
+        position:fixed;
+        top:0;
+        left:0;
         width:100vw;
         height:100vh;
-        position:relative;
         background:black;
+        overflow:hidden;
     }
+
     video {
         width:100%;
         height:100%;
         object-fit:contain;
-        background:black;
+        position:absolute;
+        top:0;
+        left:0;
     }
 
-    /* Alt bar */
+    /* ALT BAR */
     #controls {
         position:absolute;
         bottom:0;
@@ -33,9 +40,10 @@
         padding:0 12px;
         opacity:0;
         transition:opacity .3s;
+        pointer-events:auto;
     }
 
-    /* LIVE */
+    /* LIVE yazısı */
     #liveTag {
         color:white;
         font-size:15px;
@@ -54,20 +62,16 @@
     }
 
     /* Progress bar */
-    #progress {
-        flex:1;
-        margin:0 12px;
-    }
-    #progress input {
-        width:100%;
-    }
+    #progress { flex:1; margin:0 12px; }
+    #progress input { width:100%; }
 
-    /* Buttons */
-    #volumeBtn, #fsBtn {
+    /* Ses + Tam ekran */
+    .btn {
         font-size:28px;
         color:white;
         margin-left:10px;
         cursor:pointer;
+        user-select:none;
     }
 </style>
 </head>
@@ -75,17 +79,17 @@
 <body>
 
 <div id="videoContainer">
-    <video id="player" autoplay playsinline></video>
+    <video id="myVideo" playsinline autoplay></video>
 
     <div id="controls">
         <div id="liveTag">LIVE</div>
 
         <div id="progress">
-            <input type="range" id="seek" min="0" max="100" value="0">
+            <input type="range" id="seekBar" min="0" max="100" value="100">
         </div>
 
-        <div id="volumeBtn">🔊</div>
-        <div id="fsBtn">⛶</div>
+        <div id="volumeBtn" class="btn">🔊</div>
+        <div id="fsBtn" class="btn">⛶</div>
     </div>
 </div>
 
@@ -94,78 +98,88 @@
 <script>
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
 
-let video = document.getElementById("player");
+let video = document.getElementById("myVideo");
 let controls = document.getElementById("controls");
-let seek = document.getElementById("seek");
-let hideTimer;
-let hls;
+let seekBar = document.getElementById("seekBar");
+let hls = null;
 let currentStream = "";
+let hideTimer;
 
-// BAR GÖSTER / GİZLE
+/* ------------------ PLAYER KONTROL ------------------ */
+
 function showControls() {
     controls.style.opacity = 1;
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-        controls.style.opacity = 0;
-    }, 3000);
-}
-document.body.addEventListener("mousemove", showControls);
-document.body.addEventListener("click", showControls);
-
-// YAYINI YÜKLE
-function loadStream(url) {
-    if (hls) { hls.destroy(); }
-    video.src = "";
-
-    if (Hls.isSupported()) {
-        hls = new Hls({maxMaxBufferLength:20});
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            video.play();
-        });
-    } else {
-        video.src = url;
-        video.play();
-    }
+    hideTimer = setTimeout(()=> controls.style.opacity = 0, 3000);
 }
 
-// JSON TAKİP
-function checkStream() {
-    fetch(kontrolURL + "?t=" + Date.now())
-        .then(r => r.json())
-        .then(d => {
-            if (d.yayin && d.yayin !== currentStream) {
-                currentStream = d.yayin;
-                loadStream(currentStream);
-            }
-        });
-}
-setInterval(checkStream, 3000);
-checkStream();
+document.body.onclick = showControls;
 
-// SEEK BAR
-video.addEventListener("timeupdate", () => {
-    if (!video.duration) return;
-    seek.value = (video.currentTime / video.duration) * 100;
-});
+/* ------------------ SES ------------------ */
 
-seek.addEventListener("input", () => {
-    video.currentTime = (seek.value / 100) * video.duration;
-});
-
-// SES
 document.getElementById("volumeBtn").onclick = () => {
     video.muted = !video.muted;
 };
 
-// FULLSCREEN
+/* ------------------ TAM EKRAN ------------------ */
+
 document.getElementById("fsBtn").onclick = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
     } else {
         document.exitFullscreen();
     }
+};
+
+/* ------------------ YAYIN YÜKLE ------------------ */
+
+function loadStream(url) {
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
+
+    if (Hls.isSupported()) {
+        hls = new Hls({ autoStartLoad: true });
+
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+    } else {
+        video.src = url;
+        video.play();
+    }
+}
+
+/* ------------------ JSON KONTROL ------------------ */
+
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
+    .then(r=>r.json())
+    .then(data=>{
+        if (data.yayin && data.yayin !== currentStream) {
+            currentStream = data.yayin;
+            loadStream(currentStream);
+        }
+    });
+}
+
+checkStream();
+setInterval(checkStream, 3000);
+
+/* ------------------ SEEK ------------------ */
+
+seekBar.oninput = () => {
+    if (!video.duration) return;
+    let pos = seekBar.value / 100;
+    video.currentTime = video.duration * pos;
+};
+
+video.ontimeupdate = () => {
+    if (!video.duration) return;
+    let p = (video.currentTime / video.duration) * 100;
+    seekBar.value = p;
 };
 </script>
 
