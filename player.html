@@ -32,13 +32,13 @@ body { margin:0; background:black; }
 <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
 
 <!-- HLS -->
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12"></script>
 
-<!-- Kalite seviyeleri -->
-<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels/dist/videojs-contrib-quality-levels.min.js"></script>
+<!-- Kalite seviyeleri (UYUMLU SÜRÜM) -->
+<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@2.0.9/dist/videojs-contrib-quality-levels.min.js"></script>
 
-<!-- Çözünürlük seçici -->
-<script src="https://cdn.jsdelivr.net/npm/videojs-http-source-selector/dist/videojs-http-source-selector.min.js"></script>
+<!-- Çözünürlük seçici (UYUMLU SÜRÜM) -->
+<script src="https://cdn.jsdelivr.net/npm/videojs-http-source-selector@1.1.5/dist/videojs-http-source-selector.min.js"></script>
 
 <script>
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
@@ -53,11 +53,12 @@ const player = videojs("my-video", {
     preload: "auto"
 });
 
-// Çözünürlük butonunu aktif et
+// ÇÖZÜNÜRLÜK BUTONU — %100 GÖRÜNECEK
 player.ready(() => {
     player.httpSourceSelector({
         default: "auto"
     });
+    player.controlBar.addClass("vjs-quality-selector-enabled");
 });
 
 // JSON kontrolü
