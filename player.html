@@ -1,134 +1,194 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canlı Yayın</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canlı Yayın</title>
 
-<link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
+  <!-- Video.js CSS -->
+  <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
 
-<style>
-body { margin: 0; background: black; }
-#my-video { width: 100%; height: 100vh; object-fit: cover; }
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+    }
 
-#quality-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  font-size: 32px;
-  color: white;
-  cursor: pointer;
-  z-index: 9999;
-}
+    /* Tüm alanı kaplasın */
+    #player-wrap {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      overflow: hidden;
+    }
 
-#quality-menu {
-  position: absolute;
-  top: 56px;
-  right: 12px;
-  background: rgba(0,0,0,0.8);
-  padding: 10px 14px;
-  border-radius: 8px;
-  min-width: 120px;
-  display: none;
-  z-index: 9999;
-}
+    /* VideoJS video alanı */
+    #my-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* istersen cover yaparsın: cover */
+    }
 
-#quality-menu div {
-  color: white;
-  padding: 7px 5px;
-  font-size: 18px;
-  cursor: pointer;
-}
+    /* Sağ üst dişli ikonu */
+    #quality-btn {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      font-size: 30px;
+      color: #fff;
+      cursor: pointer;
+      z-index: 9999;
+      user-select: none;
+    }
 
-#quality-menu div:hover {
-  background: rgba(255,255,255,0.2);
-}
-</style>
+    /* Kalite menüsü */
+    #quality-menu {
+      position: absolute;
+      top: 55px;
+      right: 14px;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 10px 12px;
+      border-radius: 8px;
+      min-width: 120px;
+      display: none;
+      z-index: 9999;
+    }
 
+    #quality-menu div {
+      color: #fff;
+      padding: 6px 4px;
+      font-size: 16px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #quality-menu div:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
 </head>
 <body>
 
-<video id="my-video" class="video-js vjs-default-skin" autoplay controls></video>
+  <div id="player-wrap">
+    <video
+      id="my-video"
+      class="video-js vjs-default-skin"
+      autoplay
+      controls
+      playsinline
+    ></video>
 
-<div id="quality-btn">⚙</div>
-<div id="quality-menu"></div>
+    <!-- Dişli ikonu -->
+    <div id="quality-btn">⚙</div>
 
-<script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- Kalite listesi -->
+    <div id="quality-menu"></div>
+  </div>
 
-<script>
-const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
+  <!-- Video.js -->
+  <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+  <!-- HLS.js -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-let currentStream = "";
-let hlsInstance = null;
-const player = videojs("my-video", { autoplay: true, controls: true });
+  <script>
+    // YAYIN KONTROL JSON ADRESİN – BUNU ZATEN OLUŞTURMUŞTUK
+    const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
-function checkStream() {
-  fetch(kontrolURL + "?v=" + Date.now())
-    .then(res => res.json())
-    .then(data => {
-      if (data.yayin && data.yayin !== currentStream) {
-        currentStream = data.yayin;
-        loadStream(currentStream);
-      }
-    })
-    .catch(err => console.log("JSON okunamadı:", err));
-}
+    let currentStream = "";
+    let hlsInstance = null;
 
-function loadStream(url) {
-  if (hlsInstance) {
-    hlsInstance.destroy();
-    hlsInstance = null;
-  }
-
-  if (Hls.isSupported()) {
-    hlsInstance = new Hls({ enableWorker: true });
-    hlsInstance.loadSource(url);
-    hlsInstance.attachMedia(player.tech().el_);
-
-    hlsInstance.on(Hls.Events.MANIFEST_PARSED, function(_, data) {
-      buildQualityMenu(data.levels);
-      player.play();
+    // VideoJS player
+    const player = videojs("my-video", {
+      autoplay: true,
+      controls: true,
+      preload: "auto"
     });
-  } else {
-    player.src({ src: url, type: "application/x-mpegURL" });
-    player.play();
-  }
-}
 
-function buildQualityMenu(levels) {
-  const menu = document.getElementById("quality-menu");
-  menu.innerHTML = "";
+    // JSON'dan yayın adresini kontrol et
+    function checkStream() {
+      fetch(kontrolURL + "?t=" + Date.now(), { cache: "no-store" })
+        .then(r => r.json())
+        .then(data => {
+          if (data.yayin && data.yayin !== currentStream) {
+            currentStream = data.yayin;
+            loadStream(currentStream);
+          }
+        })
+        .catch(() => {
+          // sessiz geç
+        });
+    }
 
-  levels.sort((a,b) => b.height - a.height);
+    // Yayını yükle
+    function loadStream(url) {
+      // Eski HLS varsa temizle
+      if (hlsInstance) {
+        try { hlsInstance.destroy(); } catch (e) {}
+        hlsInstance = null;
+      }
 
-  levels.forEach((lvl,index) => {
-    const label = lvl.height + "p";
-    const div = document.createElement("div");
-    div.textContent = label;
-    div.onclick = () => {
-      if (hlsInstance) hlsInstance.currentLevel = index;
-      menu.style.display = "none";
+      if (Hls.isSupported()) {
+        hlsInstance = new Hls({ enableWorker: true });
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(player.tech().el_);
+
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function (_, data) {
+          buildQualityMenu(data.levels);
+          player.play();
+        });
+      } else {
+        // Eski cihazlarda native HLS
+        player.src({ src: url, type: "application/x-mpegURL" });
+        player.play();
+      }
+    }
+
+    // Kalite menüsünü oluştur
+    function buildQualityMenu(levels) {
+      const menu = document.getElementById("quality-menu");
+      menu.innerHTML = "";
+
+      if (!levels || !levels.length) return;
+
+      // Yüksekten düşüğe sırala (1440, 1080, 720...)
+      levels.sort((a, b) => (b.height || 0) - (a.height || 0));
+
+      levels.forEach((lvl, index) => {
+        const label = (lvl.height ? lvl.height + "p" : "Bilinmiyor");
+        const div = document.createElement("div");
+        div.textContent = label;
+
+        div.onclick = () => {
+          if (hlsInstance) {
+            hlsInstance.currentLevel = index;
+          }
+          menu.style.display = "none";
+        };
+
+        menu.appendChild(div);
+      });
+
+      // Otomatik kalite
+      const auto = document.createElement("div");
+      auto.textContent = "Otomatik";
+      auto.onclick = () => {
+        if (hlsInstance) {
+          hlsInstance.currentLevel = -1;
+        }
+        menu.style.display = "none";
+      };
+      menu.appendChild(auto);
+    }
+
+    // Dişliye tıklayınca menüyü aç/kapat
+    document.getElementById("quality-btn").onclick = () => {
+      const menu = document.getElementById("quality-menu");
+      menu.style.display = menu.style.display === "block" ? "none" : "block";
     };
-    menu.appendChild(div);
-  });
 
-  const auto = document.createElement("div");
-  auto.textContent = "Otomatik";
-  auto.onclick = () => {
-    if (hlsInstance) hlsInstance.currentLevel = -1;
-    menu.style.display = "none";
-  };
-  menu.appendChild(auto);
-}
-
-document.getElementById("quality-btn").onclick = () => {
-  const menu = document.getElementById("quality-menu");
-  menu.style.display = (menu.style.display === "block") ? "none" : "block";
-};
-
-setInterval(checkStream, 3000);
-checkStream();
-</script>
-
+    // İlk yükleme + periyodik kontrol
+    checkStream();
+    setInterval(checkStream, 5000);
+  </script>
 </body>
 </html>
