@@ -1,128 +1,218 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canlı Yayın</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canlı Yayın (Stabilize Edilmiş)</title>
 
 <style>
-body {
-  margin:0;
-  background:black;
-  overflow:hidden;
-}
+    body { margin:0; background:black; overflow:hidden; }
+    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
+    video { width:100%; height:100%; object-fit:contain; background:black; }
 
-video {
-  width:100%;
-  height:100vh;
-  background:black;
-  object-fit:contain;
-}
+    #controls {
+        position:absolute; bottom:0; left:0;
+        width:100%; height:55px;
+        background:rgba(0,0,0,0.55);
+        display:flex; align-items:center;
+        padding:0 12px;
+        opacity:0; transition:opacity .3s;
+        box-sizing: border-box;
+    }
 
-#controls {
-  position:absolute;
-  bottom:0;
-  width:100%;
-  height:60px;
-  background:rgba(0,0,0,0.45);
-  display:flex;
-  align-items:center;
-  padding:8px;
-  opacity:0;
-  transition:opacity .3s;
-}
+    #liveTag {
+        color:white; font-size:15px; display:flex; align-items:center;
+        margin-right:10px; flex-shrink:0;
+    }
+    #liveTag::before {
+        content:""; width:10px; height:10px; background:red;
+        border-radius:50%; margin-right:6px; display:inline-block;
+    }
 
-#seek { width:100%; }
-#volume { font-size:28px; color:white; margin-left:10px; }
+    #progress { flex:1; margin:0 12px; min-width:0; }
+    #progress input { width:100%; display:block; }
 
-#live {
-  color:red;
-  margin-right:10px;
-  font-weight:bold;
-}
+    #volumeBtn, #fsBtn {
+        font-size:28px; color:white; margin-left:10px;
+        cursor:pointer; flex-shrink:0;
+    }
 </style>
 </head>
 
 <body>
 
-<video id="player" autoplay playsinline></video>
+<div id="videoContainer">
+    <video id="player" autoplay playsinline></video>
 
-<div id="controls">
-  <div id="live">● CANLI</div>
-  <input type="range" id="seek" min="0" max="100" value="0">
-  <div id="volume">🔊</div>
+    <div id="controls">
+        <div id="liveTag">LIVE</div>
+
+        <div id="progress">
+            <input type="range" id="seek" min="0" max="100" value="0" style="display:none;">
+        </div>
+
+        <div id="volumeBtn">🔊</div>
+        <div id="fsBtn">⛶</div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-// JSON LİNKİN
-const kontrolURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
+const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+const LIVE_CHECK_INTERVAL = 5000; // Yayın kontrol aralığı (5 saniye)
+const RECONNECT_DELAY = 5000;     // Hata sonrası yeniden bağlanma gecikmesi (5 saniye)
 
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
 let seek = document.getElementById("seek");
-let hls = null;
-
-// ✔ Kontrolleri otomatik gizle
 let hideTimer;
-function showControls(){
-  controls.style.opacity = 1;
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(()=>{ controls.style.opacity = 0; }, 2000);
+let hls;
+let currentStream = "";
+let reconnectTimeout;
+
+/* -------------------------
+   ALT BAR OTOMATİK GİZLENME
+--------------------------*/
+function showControls() {
+    controls.style.opacity = 1;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        controls.style.opacity = 0;
+    }, 3000);
 }
 document.body.addEventListener("mousemove", showControls);
+document.body.addEventListener("click", showControls);
 
-// ✔ JSON oku ve yayını başlat
-async function loadJSON(){
-  try {
-    let res = await fetch(kontrolURL + "?t=" + Date.now());
-    let data = await res.json();
-    if(data.channel){
-      loadStream(data.channel);
+/* -------------------------
+   HATA İŞLEME VE YENİDEN BAĞLANMA
+--------------------------*/
+function handleHlsError(event, data) {
+    if (data.fatal) {
+        console.error("HLS Fatal Error:", data);
+        if (hls) hls.destroy();
+        
+        // Yeniden bağlanmayı gecikmeli olarak dene
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        reconnectTimeout = setTimeout(() => {
+            console.log("Hata sonrası yayını yeniden yükleme denemesi...");
+            loadStream(currentStream); // Mevcut yayını yeniden yükle
+        }, RECONNECT_DELAY);
     }
-  } catch(e){
-    console.log("JSON okunamadı:",e);
-  }
 }
 
-// ✔ Yayını yükle
-function loadStream(url){
-  if(hls) {
-    hls.destroy();
-    hls = null;
-  }
+/* -------------------------
+   YAYINI YÜKLE
+--------------------------*/
+function loadStream(url) {
+    if (hls) {
+        hls.stopLoad();
+        hls.destroy();
+    }
+    video.src = "";
 
-  if(Hls.isSupported()){
-    hls = new Hls({
-      maxMaxBufferLength: 2
-    });
+    if (!url) {
+        console.log("Yayın URL'si boş.");
+        return;
+    }
+    
+    // Bağlantı gecikmesini temizle
+    if (reconnectTimeout) clearTimeout(reconnectTimeout);
 
-    hls.loadSource(url);
-    hls.attachMedia(video);
 
-    hls.on(Hls.Events.MANIFEST_PARSED, function(event, data){
-      video.play();
-    });
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            // Stabilite için ayarlar
+            maxBufferLength: 30,  // Maksimum tampon uzunluğu (saniye)
+            maxMaxBufferLength: 60, // İstenen maksimum tampon uzunluğu
+            liveSyncDurationCount: 3, // Canlı yayın senkronizasyonu için gereken segment sayısı
+            liveMaxLatencyDurationCount: Infinity, // Canlı gecikme kısıtlamasını kaldır
+        });
 
-  } else {
-    video.src = url;
-    video.play();
-  }
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        /* EN YÜKSEK KALİTEYE SABİTLEME */
+        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+            if (data.levels && data.levels.length > 0) {
+                let highest = data.levels.length - 1;
+                hls.currentLevel = highest;   // kaliteyi kilitle
+            }
+            video.play().catch(e => console.log("Video oynatma hatası:", e));
+        });
+
+        /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
+        hls.on(Hls.Events.LEVEL_SWITCHING, function () {
+            hls.nextLevel = hls.levels.length - 1;
+        });
+
+        // Hata yakalama
+        hls.on(Hls.Events.ERROR, handleHlsError);
+
+    } else {
+        video.src = url;
+        video.play().catch(e => console.log("Video oynatma hatası:", e));
+    }
 }
 
-// ✔ Seek çubuğu
-seek.addEventListener("input", ()=>{
-  if(video.duration){
-    video.currentTime = video.duration * (seek.value / 100);
-  }
+/* -------------------------
+   JSON TAKİP
+--------------------------*/
+function checkStream() {
+    fetch(kontrolURL + "?t=" + Date.now())
+        .then(r => {
+            if (!r.ok) throw new Error("JSON yüklenemedi.");
+            return r.json();
+        })
+        .then(d => {
+            // Sadece URL değişirse yayını yeniden yükle
+            if (d.yayin && d.yayin !== currentStream) {
+                console.log("Yeni yayın bulundu: ", d.yayin);
+                currentStream = d.yayin;
+                loadStream(currentStream);
+            }
+        })
+        .catch(e => console.error("Yayın kontrol hatası:", e));
+}
+setInterval(checkStream, LIVE_CHECK_INTERVAL);
+checkStream(); // Sayfa yüklendiğinde hemen başlat
+
+/* -------------------------
+   SEEK BAR (Canlı yayın için pasif bırakıldı)
+--------------------------*/
+// Canlı yayınlarda seek bar genellikle kullanılmaz ve kaldırılmıştır.
+// Eğer bu kodları tutmak isterseniz:
+/*
+video.addEventListener("timeupdate", () => {
+    if (!video.duration || isNaN(video.duration)) return;
+    seek.value = (video.currentTime / video.duration) * 100;
 });
+seek.addEventListener("input", () => {
+    if (!video.duration || isNaN(video.duration)) return;
+    video.currentTime = (seek.value / 100) * video.duration;
+});
+*/
 
-// ✔ Otomatik güncelleme (5 saniyede bir JSON kontrol)
-setInterval(loadJSON, 5000);
+/* -------------------------
+   SES
+--------------------------*/
+document.getElementById("volumeBtn").onclick = () => {
+    video.muted = !video.muted;
+    document.getElementById("volumeBtn").textContent = video.muted ? '🔇' : '🔊';
+};
 
-// ✔ İlk açılışta JSON yükle
-loadJSON();
+/* -------------------------
+   TAM EKRAN
+--------------------------*/
+document.getElementById("fsBtn").onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+        document.getElementById("fsBtn").textContent = '縮'; // Küçültme ikonu
+    } else {
+        document.exitFullscreen();
+        document.getElementById("fsBtn").textContent = '⛶'; // Büyütme ikonu
+    }
+};
 </script>
 
 </body>
