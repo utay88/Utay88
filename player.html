@@ -29,7 +29,8 @@
         border-radius:50%; margin-right:6px; display:inline-block;
     }
 
-    #progress { flex:1; margin:0 12px; min-width:0; }
+    /* Canlı yayınlarda SEEK bar genellikle kullanılmaz, ancak hızlandırma odaklı olduğu için gizliyorum */
+    #progress { flex:1; margin:0 12px; min-width:0; display:none; }
     #progress input { width:100%; display:block; }
 
     #volumeBtn, #fsBtn {
@@ -45,7 +46,7 @@
     <video id="player" autoplay playsinline></video>
 
     <div id="controls">
-        <div id="liveTag">LIVE</div>
+        <div id="liveTag">CANLI</div>
 
         <div id="progress">
             <input type="range" id="seek" min="0" max="100" value="0">
@@ -60,6 +61,8 @@
 
 <script>
 const kontrolURL = "https://raw.githubusercontent.com/Utay88/Utay88/main/kontrol.json";
+// JSON kontrol aralığı 3000ms'den 1000ms'ye (1 saniye) düşürüldü.
+const CHECK_INTERVAL = 1000;
 
 let video = document.getElementById("player");
 let controls = document.getElementById("controls");
@@ -85,12 +88,19 @@ document.body.addEventListener("click", showControls);
    YAYINI YÜKLE
 --------------------------*/
 function loadStream(url) {
-    if (hls) hls.destroy();
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
     video.src = "";
 
     if (Hls.isSupported()) {
         hls = new Hls({
-            maxMaxBufferLength:20
+            // Canlı yayın gecikmesini azaltmak için buffer boyutu düşürüldü
+            maxMaxBufferLength: 5,
+            liveSyncDurationCount: 3, // Canlı senkronizasyon için daha az segment kullan
+            liveMaxLatencyDurationCount: 5, // Maksimum gecikme süresi
+            enableWorker: true // Tarayıcı performansını artırır
         });
 
         hls.loadSource(url);
@@ -99,20 +109,24 @@ function loadStream(url) {
         /* EN YÜKSEK KALİTEYE SABİTLEME */
         hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
             if (data.levels && data.levels.length > 0) {
+                // Video oynamaya başlamadan önce kaliteyi ayarla
                 let highest = data.levels.length - 1;
                 hls.currentLevel = highest;   // kaliteyi kilitle
             }
-            video.play();
+            video.play().catch(e => console.error("Video oynatılamadı:", e));
         });
 
         /* Eğer kalite değişmeye çalışırsa tekrar en yükseğe çek */
-        hls.on(Hls.Events.LEVEL_SWITCHING, function () {
-            hls.nextLevel = hls.levels.length - 1;
+        hls.on(Hls.Events.LEVEL_SWITCHING, function (event, data) {
+            // Sadece şu anki seviye en yüksek seviye değilse müdahale et
+            if (data.level !== hls.levels.length - 1) {
+                hls.nextLevel = hls.levels.length - 1;
+            }
         });
 
     } else {
         video.src = url;
-        video.play();
+        video.play().catch(e => console.error("Video oynatılamadı (native):", e));
     }
 }
 
@@ -120,28 +134,34 @@ function loadStream(url) {
    JSON TAKİP
 --------------------------*/
 function checkStream() {
+    // Cache'i önlemek için sorgu parametresi eklendi
     fetch(kontrolURL + "?t=" + Date.now())
         .then(r => r.json())
         .then(d => {
             if (d.yayin && d.yayin !== currentStream) {
+                console.log("Yeni yayın bulundu:", d.yayin);
                 currentStream = d.yayin;
                 loadStream(currentStream);
             }
-        });
+        })
+        .catch(e => console.error("Yayın kontrol hatası:", e));
 }
-setInterval(checkStream, 3000);
-checkStream();
+// Kontrol aralığı kısaltıldı
+setInterval(checkStream, CHECK_INTERVAL);
+checkStream(); // Sayfa yüklenir yüklenmez ilk kontrolü yap
 
 /* -------------------------
-   SEEK BAR
+   SEEK BAR (Canlı yayında genellikle gereksizdir, ancak kodlama hatası vermemesi için bırakıldı)
 --------------------------*/
-video.addEventListener("timeupdate", () => {
-    if (!video.duration) return;
+/* video.addEventListener("timeupdate", () => {
+    if (!video.duration || video.duration === Infinity) return;
     seek.value = (video.currentTime / video.duration) * 100;
 });
 seek.addEventListener("input", () => {
-    video.currentTime = (seek.value / 100) * video.duration;
-});
+    if (video.duration && video.duration !== Infinity) {
+        video.currentTime = (seek.value / 100) * video.duration;
+    }
+}); */ // Seek bar artık HTML'de gizlendiği için bu kısım yorum satırı yapıldı.
 
 /* -------------------------
    SES
