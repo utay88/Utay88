@@ -1,166 +1,73 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live Player</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-    body {
+    body, html {
         margin: 0;
+        padding: 0;
         background: black;
+        height: 100%;
         overflow: hidden;
     }
+
     video {
         width: 100vw;
         height: 100vh;
         background: black;
     }
-    #qualityMenu {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: rgba(0,0,0,0.6);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-size: 14px;
-        cursor: pointer;
-        z-index: 9999;
-    }
-    #qualityList {
-        position: absolute;
-        top: 45px;
-        right: 10px;
-        background: rgba(0,0,0,0.8);
-        color: white;
-        padding: 10px;
-        border-radius: 6px;
-        display: none;
-        z-index: 9999;
-    }
-    #qualityList div {
-        padding: 6px;
-        cursor: pointer;
-        border-bottom: 1px solid #444;
-    }
-    #qualityList div:last-child {
-        border-bottom: none;
-    }
-    #qualityList div:hover {
-        background: #333;
-    }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
 </head>
 <body>
 
-<video id="v" controls playsinline></video>
-
-<div id="qualityMenu">Kalite</div>
-<div id="qualityList"></div>
+<video id="player" controls autoplay></video>
 
 <script>
-const video = document.getElementById("v");
+    const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
+    let video = document.getElementById("player");
+    let hls;
+    let currentStream = "";
 
-const JSON_URL = "https://raw.githubusercontent.com/utay88/Utay88/main/aktif.json";
-const CHECK_INTERVAL = 5000;
-
-let currentURL = "";
-let hls = null;
-
-// Player başlatma
-function startStream(url) {
-    if (!url) return;
-
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
-
-    if (Hls.isSupported()) {
+    function loadStream(url) {
+        if (hls) {
+            hls.destroy();
+        }
         hls = new Hls({
-            maxMaxBufferLength: 10,
-            enableWorker: true
+            maxBufferLength: 30,
+            startLevel: -1
         });
+
         hls.loadSource(url);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            video.play().catch(()=>{});
-            buildQualityMenu();
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            video.play();
         });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = url;
-        video.play().catch(()=>{});
     }
-}
 
-// JSON’dan link çek
-async function checkJSON() {
-    try {
-        const response = await fetch(JSON_URL + "?t=" + Date.now());
-        const data = await response.json();
-        const newURL = data.channel?.trim();
+    async function checkJSON() {
+        try {
+            const response = await fetch(jsonURL + "?t=" + Date.now());
+            const data = await response.json();
+            const newStream = data.channel.trim();
 
-        if (!newURL) return;
-
-        if (newURL !== currentURL) {
-            currentURL = newURL;
-            startStream(newURL);
+            if (newStream !== currentStream) {
+                currentStream = newStream;
+                loadStream(newStream);
+            }
+        } catch (e) {
+            console.log("JSON okunamadı:", e);
         }
-
-    } catch (e) {
-        console.log("JSON okunamadı", e);
     }
-}
 
-// İlk yükleme
-checkJSON();
+    // İlk oku
+    checkJSON();
 
-// Düzenli kontrol
-setInterval(checkJSON, CHECK_INTERVAL);
-
-
-// =============== KALİTE MENÜSÜ =====================
-
-function buildQualityMenu() {
-    if (!hls) return;
-
-    const qualityList = document.getElementById("qualityList");
-    qualityList.innerHTML = "";
-
-    const levels = hls.levels;
-
-    if (!levels || levels.length === 0) return;
-
-    // AUTO seçeneği
-    const autoDiv = document.createElement("div");
-    autoDiv.textContent = "Otomatik";
-    autoDiv.onclick = () => {
-        hls.currentLevel = -1;
-        qualityList.style.display = "none";
-    };
-    qualityList.appendChild(autoDiv);
-
-    // Çözünürlükler
-    levels.forEach((level, index) => {
-        const div = document.createElement("div");
-        div.textContent = level.height + "p";
-        div.onclick = () => {
-            hls.currentLevel = index;
-            qualityList.style.display = "none";
-        };
-        qualityList.appendChild(div);
-    });
-}
-
-// Menü aç/kapa
-document.getElementById("qualityMenu").onclick = () => {
-    const list = document.getElementById("qualityList");
-    list.style.display = list.style.display === "block" ? "none" : "block";
-};
-
+    // Her 5 saniyede JSON kontrol et
+    setInterval(checkJSON, 5000);
 </script>
 
 </body>
