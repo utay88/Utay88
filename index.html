@@ -1,122 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>JW Player Style</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>Ultra Basic HLS Player</title>
 
 <style>
-    body,html {
-        margin:0;
-        padding:0;
-        background:#000;
-        height:100%;
-        overflow:hidden;
-    }
-
-    #player {
-        position:absolute;
-        inset:0;
-    }
-
-    video {
-        width:100%;
-        height:100%;
-        object-fit:contain;
-        background:#000;
-    }
-
-    /* JWPlayer benzeri kontroller */
-    #controls {
-        position:absolute;
-        bottom:0;
-        width:100%;
-        height:50px;
-        background:rgba(0,0,0,0.4);
-        display:flex;
-        align-items:center;
-        padding:0 10px;
-        opacity:0;
-        transition:0.3s;
-    }
-
-    #player:hover #controls {
-        opacity:1;
-    }
-
-    .btn {
-        color:white;
-        font-size:22px;
-        margin-right:15px;
-        cursor:pointer;
-        user-select:none;
-    }
+body, html {
+    margin:0;
+    padding:0;
+    background:#000;
+    height:100%;
+    overflow:hidden;
+}
+video {
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    background:#000;
+}
+#playbtn {
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:white;
+    padding:20px;
+    border-radius:50%;
+    font-size:28px;
+    cursor:pointer;
+    z-index:999;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
 
-<div id="player">
-    <video id="video" playsinline webkit-playsinline></video>
-
-    <div id="controls">
-        <div id="playBtn" class="btn">▶</div>
-        <div id="qualityBtn" class="btn">HD</div>
-    </div>
-</div>
+<div id="playbtn">▶</div>
+<video id="v" playsinline webkit-playsinline></video>
 
 <script>
+const STREAM = "https://utay88.github.io/Utay88/live/trt1.m3u8?" + Date.now();
+const video = document.getElementById("v");
+const btn = document.getElementById("playbtn");
 
-// Yayın dosyası SENİN GitHub’dan okuyor
-const STREAM_FILE = "https://utay88.github.io/Utay88/live/trt1.m3u8?x=" + Date.now();
+btn.onclick = () => {
+    btn.style.display = "none";
 
-const video = document.getElementById("video");
-const playBtn = document.getElementById("playBtn");
+    if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(STREAM);
+        hls.attachMedia(video);
 
-// JWPlayer gibi oynat/durdur
-playBtn.onclick = () => {
-    if (video.paused) {
-        video.play();
-        playBtn.innerHTML = "❚❚";
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            hls.currentLevel = hls.levels.length - 1; // EN YÜKSEK KALİTE
+            video.play();
+        });
+
     } else {
-        video.pause();
-        playBtn.innerHTML = "▶";
+        // Tarayıcı HLS destekliyorsa direkt oynatır
+        video.src = STREAM;
+        video.play();
     }
 };
 
-// Tıklayınca DURMASIN
-video.addEventListener("click", e => {
-    e.preventDefault();
-});
-
-// ÇÖZÜNÜRLÜĞÜ HER ZAMAN EN YÜKSEK SEÇ
-function loadStream(url) {
-    if (Hls.isSupported()) {
-        const hls = new Hls({
-            maxBufferLength: 10,
-            maxMaxBufferLength: 60,
-            enableWorker: true,
-            startLevel: -1, 
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            const highest = hls.levels.length - 1;
-            hls.currentLevel = highest;
-            video.play();
-            playBtn.innerHTML = "❚❚";
-        });
-    } else {
-        video.src = url;
-        video.play();
-    }
-}
-
-loadStream(STREAM_FILE);
-
+// Tıklamayla durmasını engelle
+video.addEventListener("pause", ()=> video.play());
 </script>
 
 </body>
