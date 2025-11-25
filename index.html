@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shaka Smart Player</title>
+<title>Shaka Premium Player</title>
 
-<!-- Shaka Player -->
+<!-- Shaka Player Core -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
 
 <style>
@@ -29,8 +29,45 @@
     video {
         width: 100%;
         height: 100%;
-        object-fit: contain; /* Kesme yok, taşma yok */
+        object-fit: contain;
         background: #000;
+        pointer-events: none; /* Tıklanınca durmasını tamamen engeller */
+    }
+
+    #qualityMenu {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 10px 14px;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        font-size: 16px;
+        border-radius: 6px;
+        font-family: sans-serif;
+        cursor: pointer;
+        z-index: 9999;
+    }
+
+    #qualityList {
+        display: none;
+        position: fixed;
+        bottom: 65px;
+        right: 20px;
+        background: rgba(0,0,0,0.85);
+        padding: 8px;
+        border-radius: 6px;
+        z-index: 9999;
+    }
+
+    #qualityList div {
+        padding: 6px 10px;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    #qualityList div:hover {
+        background: rgba(255,255,255,0.2);
     }
 </style>
 
@@ -38,43 +75,63 @@
 <body>
 
 <div id="videoContainer">
-    <video id="video" autoplay controls playsinline></video>
+    <video id="video" autoplay playsinline controls></video>
+
+    <div id="qualityMenu">Kalite</div>
+
+    <div id="qualityList"></div>
 </div>
 
 <script>
 const PLAYLIST_URL = "https://utay88.github.io/Utay88/live/trt1.m3u8";
 
-async function loadStream() {
+async function loadStreamURL() {
     const res = await fetch(PLAYLIST_URL + "?t=" + Date.now());
     return (await res.text()).trim();
 }
 
 async function start() {
     const video = document.getElementById('video');
-    const stream = await loadStream();
+    const qualityMenu = document.getElementById('qualityMenu');
+    const qualityList = document.getElementById('qualityList');
 
-    if (!stream) {
-        alert("Yayın alınamadı.");
+    const stream = await loadStreamURL();
+    if (!stream) return alert("Yayın alınamadı");
+
+    if (!shaka.Player.isBrowserSupported()) {
+        alert("Cihaz Shaka desteklemiyor.");
         return;
     }
 
-    if (shaka.Player.isBrowserSupported()) {
-        const player = new shaka.Player(video);
+    const player = new shaka.Player(video);
 
-        // En yüksek kaliteyi sabitle
-        player.getConfiguration().abr = {
-            enabled: false
+    // Otomatik kaliteyi kapat (sen en yüksek kalite sabit istiyorsun)
+    player.configure({
+        abr: { enabled: false }
+    });
+
+    await player.load(stream);
+
+    // Kalite menüsü için level’ları al
+    const tracks = player.getVariantTracks();
+    qualityList.innerHTML = "";
+
+    tracks.forEach(track => {
+        const item = document.createElement("div");
+        item.innerText = track.height + "p";
+
+        item.onclick = () => {
+            player.selectVariantTrack(track, true);
+            qualityList.style.display = "none";
         };
 
-        player.load(stream).then(() => {
-            console.log("Yayın açıldı:", stream);
-        }).catch(error => {
-            console.error("Shaka hata:", error);
-        });
+        qualityList.appendChild(item);
+    });
 
-    } else {
-        alert("Tarayıcı Shaka desteklemiyor!");
-    }
+    // Menü butonu aç/kapa
+    qualityMenu.onclick = () => {
+        qualityList.style.display = (qualityList.style.display === "block") ? "none" : "block";
+    };
 }
 
 start();
