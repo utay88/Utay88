@@ -2,66 +2,93 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<title>Player</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Perfect Player</title>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <style>
-html, body {
+body, html {
     margin: 0;
     padding: 0;
+    background: black;
     height: 100%;
-    background: #000;
     overflow: hidden;
 }
 
-#v {
+#video {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background: #000;
-    pointer-events: none; /* ekrana dokununca durmasın */
+    background: black;
+}
+
+#playbtn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+    padding: 22px 28px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 50%;
+    font-size: 40px;
+    cursor: pointer;
+    z-index: 999;
+}
+
+#loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 20px;
+    display: none;
 }
 </style>
 </head>
 
 <body>
 
-<video id="v" autoplay playsinline></video>
+<div id="playbtn">▶</div>
+<div id="loading">Yükleniyor...</div>
+<video id="video" playsinline></video>
 
 <script>
-// CANLI YAYIN → CACHE KAPALI
-const LINK = "https://utay88.github.io/Utay88/live/trt1.m3u8?nocache=" + Math.random();
+const STREAM = "https://utay88.github.io/Utay88/live/trt1.m3u8?x=" + Date.now();
+const video = document.getElementById("video");
+const playbtn = document.getElementById("playbtn");
+const loading = document.getElementById("loading");
 
-const video = document.getElementById("v");
+playbtn.onclick = () => {
+    playbtn.style.display = "none";
+    loading.style.display = "block";
 
-// tıklayınca durmayı ZORLA engelle
-video.addEventListener("pause", () => video.play());
-video.addEventListener("click", e => e.preventDefault());
+    if (Hls.isSupported()) {
+        const hls = new Hls();
 
-// HLS MOTORU
-if (Hls.isSupported()) {
-    const hls = new Hls({
-        maxBufferLength: 10,
-        maxMaxBufferLength: 60,
-        startLevel: -1
-    });
+        hls.loadSource(STREAM);
+        hls.attachMedia(video);
 
-    hls.loadSource(LINK);
-    hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            const max = hls.levels.length - 1;
+            hls.currentLevel = max;
+            video.play();
+        });
 
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // EN YÜKSEK KALİTE SABİTLE
-        const max = hls.levels.length - 1;
-        hls.currentLevel = max;
+        hls.on(Hls.Events.LEVEL_LOADED, () => {
+            loading.style.display = "none";
+        });
+
+    } else {
+        video.src = STREAM;
         video.play();
-    });
+        loading.style.display = "none";
+    }
+};
 
-} else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = LINK;
-    video.play();
-}
+// Tıklayınca durdurmayı engelle
+video.addEventListener("pause", () => video.play());
 </script>
 
 </body>
