@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Full Screen Player</title>
+    <title>Universal Player</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
     <!-- HLS.js -->
@@ -12,27 +12,31 @@
         html, body {
             margin: 0;
             padding: 0;
-            background: #000;
-            width: 100%;
             height: 100%;
+            width: 100%;
+            background: #000;
             overflow: hidden;
         }
 
         #player-container {
             position: fixed;
-            inset: 0;
-            background: #000;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         video {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 100%;
-            height: 100%;
-            transform: translate(-50%, -50%);
-            object-fit: contain; /* TAŞMA YOK - KIRPMA YOK */
-            background-color: #000;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            background: black;
+            object-fit: contain; /* Kesme yok, taşma yok, en temiz */
         }
     </style>
 </head>
@@ -44,17 +48,12 @@
 
 <script>
 
-    /* ==========================================================
-       SABİT YAYIN LİNKİNİ BURAYA YAZ
-       ========================================================== */
-    const FIXED_STREAM_URL = "https://tv-trt1.medya.trt.com.tr/master.m3u8";
-    /* ========================================================== */
-
+    /* BURAYA SABIT YAYIN LINKIN */
+    const FIXED_STREAM_URL = "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8";
 
     const video = document.getElementById("video");
 
     function startStream(url) {
-
         if (Hls.isSupported()) {
 
             const hls = new Hls({
@@ -67,19 +66,13 @@
             hls.loadSource(url);
             hls.attachMedia(video);
 
-            /*  
-                MAX KALITE SABİTLEME  
-                En yüksek bitrate seviyesini otomatik seçer  
-            */
+            // En yüksek kalite sabitleme
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                let maxLevel = hls.levels.length - 1;
-                hls.currentLevel = maxLevel;  // EN YÜKSEK KALİTE
+                let max = hls.levels.length - 1;
+                hls.currentLevel = max;
             });
 
-            /*  
-                HATA KORUMASI  
-                Yayın düşerse otomatik geri bağlanır  
-            */
+            // Hata koruma
             hls.on(Hls.Events.ERROR, function (event, data) {
                 if (data.fatal) {
                     if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -98,14 +91,6 @@
     }
 
     startStream(FIXED_STREAM_URL);
-
-    /*  
-       Tam ekran tıklama desteği  
-       (Android AppCreator24 WebView için şart)  
-    */
-    document.addEventListener("click", () => {
-        if (video.requestFullscreen) video.requestFullscreen().catch(() => {});
-    });
 
 </script>
 
