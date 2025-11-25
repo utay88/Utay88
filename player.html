@@ -1,77 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>CANLI TV</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-body {
-  margin: 0;
-  background: black;
-  overflow: hidden;
-}
-#player {
-  width: 100vw;
-  height: 100vh;
-  background-color: black;
-}
-#info {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  color: white;
-  font-size: 20px;
-  font-family: Arial;
-}
-</style>
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <meta charset="UTF-8" />
+  <title>Canlı TV Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      padding: 8px 12px;
+      background: #111;
+      font-size: 14px;
+    }
+    #player-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      max-height: 100vh;
+      background: #000;
+    }
+    .info {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+  </style>
 </head>
 <body>
+  <header>
+    Canlı TV Player
+    <div class="info">
+      Yayın adresini URL parametresi ile verebilirsin: <br />
+      <code>?url=https://ornek.com/stream.m3u8</code>
+    </div>
+  </header>
 
-<div id="info">Yükleniyor...</div>
-<video id="player" controls autoplay playsinline></video>
+  <div id="player-container">
+    <video id="video" controls autoplay playsinline></video>
+  </div>
 
-<script>
-// JSON URL → sadece burayı değiştirirsin
-const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
+  <!-- hls.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    // Varsayılan stream adresi (istersen boş bırak veya kendi test adresini yaz)
+    const DEFAULT_STREAM = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 
-async function loadChannel() {
-    document.getElementById("info").innerHTML = "Yayın yükleniyor...";
+    // URL parametresinden "url" değerini al
+    const params = new URLSearchParams(window.location.search);
+    const streamUrl = params.get("url") || DEFAULT_STREAM;
 
-    try {
-        const response = await fetch(jsonURL + "?t=" + Date.now());
-        const data = await response.json();
-        const stream = data.channel;
+    const video = document.getElementById("video");
 
-        const video = document.getElementById("player");
-
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                maxBufferLength: 60,
-                xhrSetup: function(xhr, url) {
-                    xhr.setRequestHeader("Referer", "https://google.com/");
-                    xhr.withCredentials = false;
-                }
-            });
-            hls.loadSource(stream);
-            hls.attachMedia(video);
-            video.play();
-        } else {
-            video.src = stream;
-            video.play();
-        }
-
-        document.getElementById("info").innerHTML = "";
-    } catch (e) {
-        document.getElementById("info").innerHTML = "Yayın yüklenemedi.";
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        video.play().catch(() => {});
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari gibi HLS'i native oynatabilen tarayıcılar için
+      video.src = streamUrl;
+      video.addEventListener("loadedmetadata", function () {
+        video.play().catch(() => {});
+      });
+    } else {
+      // Çok eski tarayıcılar için basit fallback
+      video.src = streamUrl;
     }
-}
-
-loadChannel();
-setInterval(loadChannel, 5000); // JSON değişirse yayını anında değiştirir
-</script>
-
+  </script>
 </body>
 </html>
