@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plyr Smart Player</title>
+<title>Shaka Smart Player</title>
 
-<!-- PLYR CSS -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+<!-- Shaka Player -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
 
 <style>
     html, body {
@@ -17,7 +17,7 @@
         overflow: hidden;
     }
 
-    #player-wrapper {
+    #videoContainer {
         position: fixed;
         inset: 0;
         background: #000;
@@ -29,56 +29,52 @@
     video {
         width: 100%;
         height: 100%;
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain; /* kesinlikle taşma olmaz */
+        object-fit: contain; /* Kesme yok, taşma yok */
         background: #000;
     }
 </style>
+
 </head>
 <body>
 
-<div id="player-wrapper">
-    <video id="player" controls playsinline></video>
+<div id="videoContainer">
+    <video id="video" autoplay controls playsinline></video>
 </div>
 
-<!-- PLYR JS -->
-<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.min.js"></script>
-
 <script>
-/* Yayın dışarıdan okunuyor */
 const PLAYLIST_URL = "https://utay88.github.io/Utay88/live/trt1.m3u8";
 
-async function getURL() {
-    try {
-        const res = await fetch(PLAYLIST_URL + "?t=" + Date.now());
-        return (await res.text()).trim();
-    } catch {
-        return null;
-    }
+async function loadStream() {
+    const res = await fetch(PLAYLIST_URL + "?t=" + Date.now());
+    return (await res.text()).trim();
 }
 
 async function start() {
-    const stream = await getURL();
-    if (!stream) return alert("Yayın bulunamadı");
+    const video = document.getElementById('video');
+    const stream = await loadStream();
 
-    const video = document.getElementById("player");
+    if (!stream) {
+        alert("Yayın alınamadı.");
+        return;
+    }
 
-    // Eğer tarayıcı native HLS destekliyorsa direkt açar
-    video.src = stream;
+    if (shaka.Player.isBrowserSupported()) {
+        const player = new shaka.Player(video);
 
-    // PLYR initialize
-    const player = new Plyr('#player', {
-        autoplay: true,
-        muted: false,
-        ratio: "16:9",
-        quality: {
-            default: 1080,
-            forced: true
-        }
-    });
+        // En yüksek kaliteyi sabitle
+        player.getConfiguration().abr = {
+            enabled: false
+        };
 
-    video.play().catch(()=>{});
+        player.load(stream).then(() => {
+            console.log("Yayın açıldı:", stream);
+        }).catch(error => {
+            console.error("Shaka hata:", error);
+        });
+
+    } else {
+        alert("Tarayıcı Shaka desteklemiyor!");
+    }
 }
 
 start();
