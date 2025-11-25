@@ -1,94 +1,83 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Player</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<title>Clappr Player</title>
 
 <style>
-body, html {
-    margin: 0;
-    padding: 0;
-    background: black;
-    height: 100%;
-    overflow: hidden;
-}
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+    }
 
-#video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background: black;
-}
+    #player {
+        width: 100%;
+        height: 100%;
+    }
 
-#playbtn {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%,-50%);
-    padding: 22px 28px;
-    background: rgba(255,255,255,0.8);
-    border-radius: 50%;
-    font-size: 40px;
-    cursor: pointer;
-    z-index: 999;
-}
-
-#loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: 20px;
-    display: none;
-}
+    video {
+        object-fit: contain !important;
+    }
 </style>
-</head>
 
+<script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
+
+</head>
 <body>
 
-<div id="playbtn">▶</div>
-<div id="loading">Yükleniyor...</div>
-<video id="video" playsinline></video>
+<div id="player"></div>
 
 <script>
-const STREAM = "https://utay88.github.io/Utay88/live/trt1.m3u8?x=" + Date.now();
-const video = document.getElementById("video");
-const playbtn = document.getElementById("playbtn");
-const loading = document.getElementById("loading");
+// Yayın linkini GitHub’dan oku
+const STREAM = "https://utay88.github.io/Utay88/live/trt1.m3u8?nocache=" + Date.now();
 
-playbtn.onclick = () => {
-    playbtn.style.display = "none";
-    loading.style.display = "block";
+// Player ayarları
+var player = new Clappr.Player({
+    source: STREAM,
+    parentId: "#player",
+    autoPlay: true,
+    mute: false,
+    preload: "auto",
+    width: "100%",
+    height: "100%",
 
-    if (Hls.isSupported()) {
-        const hls = new Hls();
+    // Ekrana dokununca durmasın
+    disableVideoTagContextMenu: true,
+    pauseOnClick: false,
 
-        hls.loadSource(STREAM);
-        hls.attachMedia(video);
+    // Safari’de sorunsuz olsun
+    playback: {
+        hlsjsConfig: {
+            maxBufferLength: 10,
+            maxMaxBufferLength: 60,
+            liveSyncDuration: 3
+        }
+    },
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            const max = hls.levels.length - 1;
-            hls.currentLevel = max;
-            video.play();
-        });
-
-        hls.on(Hls.Events.LEVEL_LOADED, () => {
-            loading.style.display = "none";
-        });
-
-    } else {
-        video.src = STREAM;
-        video.play();
-        loading.style.display = "none";
+    plugins: [LevelSelector],
+    levelSelectorConfig: {
+        title: "Kalite",
+        labels: {
+            0: "En Yüksek"
+        },
+        labelCallback: function (playbackLevel, customLabel) {
+            return customLabel || playbackLevel.height + "p";
+        }
     }
-};
+});
 
-// Tıklayınca durdurmayı engelle
-video.addEventListener("pause", () => video.play());
+// Her zaman en yüksek kaliteye zorla
+player.on(Clappr.Events.PLAYER_READY, function() {
+    let levels = player.getPlugin("level_selector").levels;
+    let maxIndex = levels.length - 1;
+    player.getPlugin("level_selector").setLevel(maxIndex);
+});
 </script>
 
 </body>
