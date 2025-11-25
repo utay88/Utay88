@@ -2,77 +2,153 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ExoPlayer Mode Player</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- Modern HLS Engine (ExoPlayer API davranışıyla uyumlu) -->
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js"></script>
+<title>Özel TV Player</title>
 
 <style>
-html, body {
+body, html {
     margin: 0;
     padding: 0;
-    width: 100%;
     height: 100%;
     overflow: hidden;
-    background: black;
+    background: #000;
 }
 
-video {
+#video-container {
+    position: relative;
     width: 100%;
     height: 100%;
-    object-fit: contain; /* ExoPlayer'daki EXACT SCALING */
-    background: black;
+    background: #000;
+}
+
+#video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}
+
+/* KONTROL ÇUBUĞU – tamamen yeni tasarım */
+#controls {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    height: 55px;
+    background: rgba(20,20,20,0.7);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    opacity: 0;
+    transition: 0.3s ease;
+}
+
+#video-container:hover #controls {
+    opacity: 1;
+}
+
+/* Butonlar */
+.btn {
+    color: white;
+    font-size: 28px;
+    margin-right: 15px;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Timeline */
+#timeline {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+#timeline-fill {
+    width: 0%;
+    height: 100%;
+    background: #4fc3f7;
+}
+
+/* TIKLAMAYLA DURMAYI ENGELLEME */
+video::-webkit-media-controls {
+    display:none !important;
 }
 </style>
 
 </head>
 <body>
 
-<video id="v" playsinline webkit-playsinline></video>
+<div id="video-container">
+    <video id="video" playsinline></video>
+
+    <div id="controls">
+        <div id="playBtn" class="btn">▶</div>
+
+        <div id="timeline">
+            <div id="timeline-fill"></div>
+        </div>
+
+        <div id="fsBtn" class="btn">⛶</div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
 
-// YAYIN BURAYA YAZILACAK
-const STREAM_URL = "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8";  // ★★★ SENİN YAYIN URL’İN ★★★
+// YAYIN URL’Sİ BURAYA
+const STREAM_URL = "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8";
 
-const video = document.getElementById("v");
+const video = document.getElementById("video");
+const playBtn = document.getElementById("playBtn");
+const fsBtn = document.getElementById("fsBtn");
+const timeline = document.getElementById("timeline");
+const timelineFill = document.getElementById("timeline-fill");
 
-// Tıklayınca durmayı tamamen engelle
-video.addEventListener("pause", ()=> video.play());
-video.addEventListener("click", e=> e.preventDefault());
-
-// ExoPlayer BENZETİLMİŞ Kalite Kontrol
+// YAYINI YÜKLE
 if (Hls.isSupported()) {
-
-    const hls = new Hls({
-        maxLiveSyncPlaybackRate: 1.5,
-        liveSyncDurationCount: 2,
-
-        // EXOPLAYER BUFFER MODE
-        maxBufferSize: 50 * 1000 * 1000,
-        maxBufferLength: 30,
-        lowLatencyMode: true,
-        enableWorker: true,
-        capLevelToPlayerSize: false
-    });
-
+    const hls = new Hls();
     hls.loadSource(STREAM_URL);
     hls.attachMedia(video);
-
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // EN YÜKSEK KALİTEYE SABİTLE (ExoPlayer gibi)
-        const best = hls.levels.length - 1;
-        hls.currentLevel = best;
-
-        video.play();
-    });
-
+    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
 } else {
-    // Native HLS varsa direkt oynat
     video.src = STREAM_URL;
     video.play();
 }
+
+// TIKLAMAYLA DURMASIN
+video.addEventListener("pause", ()=> video.play());
+video.addEventListener("click", e=> e.preventDefault());
+
+// Play / Pause tusu
+playBtn.onclick = () => {
+    if (video.paused) {
+        video.play();
+        playBtn.innerHTML = "❚❚";
+    } else {
+        video.pause();
+        playBtn.innerHTML = "▶";
+    }
+};
+
+// Fullscreen butonu
+fsBtn.onclick = () => {
+    if (!document.fullscreenElement) {
+        video.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+};
+
+// Timeline güncelleme
+video.addEventListener("timeupdate", () => {
+    const pos = (video.currentTime / video.duration) * 100;
+    timelineFill.style.width = pos + "%";
+});
 
 </script>
 
