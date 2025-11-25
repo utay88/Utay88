@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Smart Adaptive Player</title>
+    <title>Universal Smart Player</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -23,7 +23,7 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: #000;
+            background: black;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -44,23 +44,25 @@
 
 <script>
 
-    const FIXED_STREAM_URL = "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8";
+    /* ---------------------------------------------------------
+       GITHUB SABİT YAYIN DOSYASI
+    --------------------------------------------------------- */
+    const PLAYLIST_URL = "https://utay88.github.io/Utay88/live/trt1.m3u8";
+
     const video = document.getElementById("video");
 
-    /* -------------------------------------------------------------
-       CİHAZ ORANI HESAPLAYAN ALGORİTMA
-       16:9 video → 20:9 ekran için otomatik optimal scaling
-    ------------------------------------------------------------- */
+    /* ---------------------------------------------------------
+       CİHAZ ORANINA GÖRE AKILLI ÖLÇEK
+       (Her ekranda taşmasız – Netflix/YouTube tarzı)
+    --------------------------------------------------------- */
     function resizeVideo() {
-        const videoRatio = 16 / 9;  // TRT1 oranı
+        const videoRatio = 16 / 9; // TRT oranı
         const screenRatio = window.innerWidth / window.innerHeight;
 
         if (screenRatio > videoRatio) {
-            // Ekran daha geniş → yatay sınırlama
             video.style.width = "100vw";
             video.style.height = "auto";
         } else {
-            // Ekran daha dar → dikey sınırlama
             video.style.height = "100vh";
             video.style.width = "auto";
         }
@@ -69,10 +71,33 @@
     window.addEventListener("resize", resizeVideo);
     window.addEventListener("orientationchange", resizeVideo);
 
-    /* -------------------------------------------------------------
+    /* ---------------------------------------------------------
+       PLAYER → GitHub m3u8 dosyasını çek
+    --------------------------------------------------------- */
+    async function loadPlaylist() {
+        try {
+            const response = await fetch(PLAYLIST_URL + "?t=" + Date.now());
+            const urlText = await response.text();
+            return urlText.trim(); 
+        } catch (error) {
+            console.error("Yayın yüklenemedi:", error);
+            return null;
+        }
+    }
+
+    /* ---------------------------------------------------------
        HLS PLAYER
-    ------------------------------------------------------------- */
-    function startStream(url) {
+    --------------------------------------------------------- */
+    async function startStream() {
+
+        const streamUrl = await loadPlaylist();
+        if (!streamUrl) {
+            console.log("Yayın bulunamadı.");
+            return;
+        }
+
+        console.log("Açılan yayın:", streamUrl);
+
         if (Hls.isSupported()) {
 
             const hls = new Hls({
@@ -82,24 +107,37 @@
                 lowLatencyMode: true
             });
 
-            hls.loadSource(url);
+            hls.loadSource(streamUrl);
             hls.attachMedia(video);
 
-            // EN YÜKSEK KALİTE SABİTLEME
+            // EN YÜKSEK KALİTE SABİTLE
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 let max = hls.levels.length - 1;
                 hls.currentLevel = max;
                 video.play();
+                resizeVideo();
+            });
+
+            // HATA KORUMA
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                if (data.fatal) {
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                        hls.startLoad();
+                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        hls.recoverMediaError();
+                    }
+                }
             });
 
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-            video.src = url;
+            video.src = streamUrl;
+            video.play();
         }
 
         resizeVideo();
     }
 
-    startStream(FIXED_STREAM_URL);
+    startStream();
 
 </script>
 
