@@ -1,107 +1,76 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>JSON Controlled Player</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<title>CANLI TV</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+body {
+  margin: 0;
+  background: black;
+  overflow: hidden;
+}
+#player {
+  width: 100vw;
+  height: 100vh;
+  background-color: black;
+}
+#info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: white;
+  font-size: 20px;
+  font-family: Arial;
+}
+</style>
 
-  <style>
-    body {
-      margin: 0;
-      background: #000;
-      overflow: hidden;
-    }
-    #player {
-      width: 100vw;
-      height: 100vh;
-      background: #000;
-      object-fit: contain;
-    }
-    #status {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 5;
-      color: white;
-      font-family: Arial;
-      background: rgba(0,0,0,0.5);
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 13px;
-    }
-  </style>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
 
-<div id="status">Yükleniyor…</div>
-<video id="player" controls playsinline></video>
+<div id="info">Yükleniyor...</div>
+<video id="player" controls autoplay playsinline></video>
 
 <script>
-  // BURAYA RAW JSON LİNKİNİ YAZ
-  const JSON_URL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
+// JSON URL → sadece burayı değiştirirsin
+const jsonURL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
-  const video = document.getElementById("player");
-  const statusBox = document.getElementById("status");
+async function loadChannel() {
+    document.getElementById("info").innerHTML = "Yayın yükleniyor...";
 
-  let currentChannel = null;
-  let hls = null;
-
-  function setStatus(msg) {
-    statusBox.textContent = msg;
-  }
-
-  function playChannel(url) {
-    setStatus("Bağlanıyor…");
-
-    if (hls) {
-      hls.destroy();
-      hls = null;
-    }
-
-    if (Hls.isSupported()) {
-      hls = new Hls();
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(()=>{});
-        setStatus("Oynatılıyor");
-      });
-    } else {
-      video.src = url;
-      video.play().catch(err => setStatus(err.message));
-      setStatus("Native HLS oynatılıyor");
-    }
-  }
-
-  async function fetchJSON() {
     try {
-      const res = await fetch(JSON_URL + "?t=" + Date.now());
-      const data = await res.json();
+        const response = await fetch(jsonURL + "?t=" + Date.now());
+        const data = await response.json();
+        const stream = data.channel;
 
-      const newUrl = data.channel;
+        const video = document.getElementById("player");
 
-      if (!newUrl) {
-        setStatus("JSON 'channel' bulunamadı!");
-        return;
-      }
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                maxBufferLength: 60,
+                xhrSetup: function(xhr, url) {
+                    xhr.setRequestHeader("Referer", "https://google.com/");
+                    xhr.withCredentials = false;
+                }
+            });
+            hls.loadSource(stream);
+            hls.attachMedia(video);
+            video.play();
+        } else {
+            video.src = stream;
+            video.play();
+        }
 
-      if (newUrl !== currentChannel) {
-        currentChannel = newUrl;
-        setStatus("Kanal değişti, yeni yayın yükleniyor…");
-        playChannel(newUrl);
-      }
-
+        document.getElementById("info").innerHTML = "";
     } catch (e) {
-      setStatus("JSON okunamadı: " + e.message);
+        document.getElementById("info").innerHTML = "Yayın yüklenemedi.";
     }
-  }
+}
 
-  // İlk yükleme
-  fetchJSON();
-  // 3 saniyede bir JSON kontrolü
-  setInterval(fetchJSON, 3000);
+loadChannel();
+setInterval(loadChannel, 5000); // JSON değişirse yayını anında değiştirir
 </script>
 
 </body>
