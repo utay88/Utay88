@@ -1,66 +1,79 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
 <meta charset="UTF-8">
+<title>ExoPlayer Mode Player</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Özel Player</title>
 
-<link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet">
+<!-- Modern HLS Engine (ExoPlayer API davranışıyla uyumlu) -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js"></script>
 
 <style>
-  body {
+html, body {
     margin: 0;
-    background: black;
-  }
-
-  .video-container {
-    width: 100vw;
-    height: 100vh;
+    padding: 0;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
-  }
+    background: black;
+}
 
-  video {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: contain !important;
-    background-color: black;
-  }
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* ExoPlayer'daki EXACT SCALING */
+    background: black;
+}
 </style>
 
 </head>
 <body>
 
-<div class="video-container">
-  <video id="player" class="video-js vjs-default-skin" controls autoplay playsinline></video>
-</div>
-
-<script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-hls/5.15.0/videojs-contrib-hls.min.js"></script>
+<video id="v" playsinline webkit-playsinline></video>
 
 <script>
-  const STREAM_URL = "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8"; // ★★★ YAYIN ADRESİNİ BURAYA YAZACAKSIN ★★★
 
-  var player = videojs('player', {
-      fluid: true,
-      aspectRatio: '16:9',
-      html5: {
-          hls: {
-              overrideNative: true
-          }
-      }
-  });
+// YAYIN BURAYA YAZILACAK
+const STREAM_URL = "BURAYA_M3U8_YAZ";  // ★★★ SENİN YAYIN URL’İN ★★★
 
-  player.src({
-      src: STREAM_URL,
-      type: "application/x-mpegURL"
-  });
+const video = document.getElementById("v");
 
-  player.play();
+// Tıklayınca durmayı tamamen engelle
+video.addEventListener("pause", ()=> video.play());
+video.addEventListener("click", e=> e.preventDefault());
 
-  // Tam ekran optimizasyonu
-  player.on("loadedmetadata", function () {
-      player.requestFullscreen();
-  });
+// ExoPlayer BENZETİLMİŞ Kalite Kontrol
+if (Hls.isSupported()) {
+
+    const hls = new Hls({
+        maxLiveSyncPlaybackRate: 1.5,
+        liveSyncDurationCount: 2,
+
+        // EXOPLAYER BUFFER MODE
+        maxBufferSize: 50 * 1000 * 1000,
+        maxBufferLength: 30,
+        lowLatencyMode: true,
+        enableWorker: true,
+        capLevelToPlayerSize: false
+    });
+
+    hls.loadSource(STREAM_URL);
+    hls.attachMedia(video);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // EN YÜKSEK KALİTEYE SABİTLE (ExoPlayer gibi)
+        const best = hls.levels.length - 1;
+        hls.currentLevel = best;
+
+        video.play();
+    });
+
+} else {
+    // Native HLS varsa direkt oynat
+    video.src = STREAM_URL;
+    video.play();
+}
+
 </script>
 
 </body>
