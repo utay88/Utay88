@@ -2,10 +2,9 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Universal Player</title>
+    <title>Smart Adaptive Player</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
-    <!-- HLS.js -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
     <style>
@@ -22,21 +21,18 @@
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
-            background: black;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
         }
 
         video {
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
-            background: black;
-            object-fit: contain; /* Kesme yok, taşma yok, en temiz */
+            position: absolute;
+            background: #000;
         }
     </style>
 </head>
@@ -48,11 +44,34 @@
 
 <script>
 
-    /* BURAYA SABIT YAYIN LINKIN */
     const FIXED_STREAM_URL = "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8";
-
     const video = document.getElementById("video");
 
+    /* -------------------------------------------------------------
+       CİHAZ ORANI HESAPLAYAN ALGORİTMA
+       16:9 video → 20:9 ekran için otomatik optimal scaling
+    ------------------------------------------------------------- */
+    function resizeVideo() {
+        const videoRatio = 16 / 9;  // TRT1 oranı
+        const screenRatio = window.innerWidth / window.innerHeight;
+
+        if (screenRatio > videoRatio) {
+            // Ekran daha geniş → yatay sınırlama
+            video.style.width = "100vw";
+            video.style.height = "auto";
+        } else {
+            // Ekran daha dar → dikey sınırlama
+            video.style.height = "100vh";
+            video.style.width = "auto";
+        }
+    }
+
+    window.addEventListener("resize", resizeVideo);
+    window.addEventListener("orientationchange", resizeVideo);
+
+    /* -------------------------------------------------------------
+       HLS PLAYER
+    ------------------------------------------------------------- */
     function startStream(url) {
         if (Hls.isSupported()) {
 
@@ -66,28 +85,18 @@
             hls.loadSource(url);
             hls.attachMedia(video);
 
-            // En yüksek kalite sabitleme
+            // EN YÜKSEK KALİTE SABİTLEME
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 let max = hls.levels.length - 1;
                 hls.currentLevel = max;
-            });
-
-            // Hata koruma
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) {
-                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                        hls.startLoad();
-                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        hls.recoverMediaError();
-                    }
-                }
+                video.play();
             });
 
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
             video.src = url;
         }
 
-        video.play().catch(() => {});
+        resizeVideo();
     }
 
     startStream(FIXED_STREAM_URL);
