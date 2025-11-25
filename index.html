@@ -1,83 +1,122 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clappr Player</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JW Player Style</title>
 
 <style>
-    html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        background: #000;
-        overflow: hidden;
+    body,html {
+        margin:0;
+        padding:0;
+        background:#000;
+        height:100%;
+        overflow:hidden;
     }
 
     #player {
-        width: 100%;
-        height: 100%;
+        position:absolute;
+        inset:0;
     }
 
     video {
-        object-fit: contain !important;
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        background:#000;
+    }
+
+    /* JWPlayer benzeri kontroller */
+    #controls {
+        position:absolute;
+        bottom:0;
+        width:100%;
+        height:50px;
+        background:rgba(0,0,0,0.4);
+        display:flex;
+        align-items:center;
+        padding:0 10px;
+        opacity:0;
+        transition:0.3s;
+    }
+
+    #player:hover #controls {
+        opacity:1;
+    }
+
+    .btn {
+        color:white;
+        font-size:22px;
+        margin-right:15px;
+        cursor:pointer;
+        user-select:none;
     }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
 
-<div id="player"></div>
+<div id="player">
+    <video id="video" playsinline webkit-playsinline></video>
+
+    <div id="controls">
+        <div id="playBtn" class="btn">▶</div>
+        <div id="qualityBtn" class="btn">HD</div>
+    </div>
+</div>
 
 <script>
-// Yayın linkini GitHub’dan oku
-const STREAM = "https://utay88.github.io/Utay88/live/trt1.m3u8?nocache=" + Date.now();
 
-// Player ayarları
-var player = new Clappr.Player({
-    source: STREAM,
-    parentId: "#player",
-    autoPlay: true,
-    mute: false,
-    preload: "auto",
-    width: "100%",
-    height: "100%",
+// Yayın dosyası SENİN GitHub’dan okuyor
+const STREAM_FILE = "https://utay88.github.io/Utay88/live/trt1.m3u8?x=" + Date.now();
 
-    // Ekrana dokununca durmasın
-    disableVideoTagContextMenu: true,
-    pauseOnClick: false,
+const video = document.getElementById("video");
+const playBtn = document.getElementById("playBtn");
 
-    // Safari’de sorunsuz olsun
-    playback: {
-        hlsjsConfig: {
+// JWPlayer gibi oynat/durdur
+playBtn.onclick = () => {
+    if (video.paused) {
+        video.play();
+        playBtn.innerHTML = "❚❚";
+    } else {
+        video.pause();
+        playBtn.innerHTML = "▶";
+    }
+};
+
+// Tıklayınca DURMASIN
+video.addEventListener("click", e => {
+    e.preventDefault();
+});
+
+// ÇÖZÜNÜRLÜĞÜ HER ZAMAN EN YÜKSEK SEÇ
+function loadStream(url) {
+    if (Hls.isSupported()) {
+        const hls = new Hls({
             maxBufferLength: 10,
             maxMaxBufferLength: 60,
-            liveSyncDuration: 3
-        }
-    },
+            enableWorker: true,
+            startLevel: -1, 
+        });
 
-    plugins: [LevelSelector],
-    levelSelectorConfig: {
-        title: "Kalite",
-        labels: {
-            0: "En Yüksek"
-        },
-        labelCallback: function (playbackLevel, customLabel) {
-            return customLabel || playbackLevel.height + "p";
-        }
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            const highest = hls.levels.length - 1;
+            hls.currentLevel = highest;
+            video.play();
+            playBtn.innerHTML = "❚❚";
+        });
+    } else {
+        video.src = url;
+        video.play();
     }
-});
+}
 
-// Her zaman en yüksek kaliteye zorla
-player.on(Clappr.Events.PLAYER_READY, function() {
-    let levels = player.getPlugin("level_selector").levels;
-    let maxIndex = levels.length - 1;
-    player.getPlugin("level_selector").setLevel(maxIndex);
-});
+loadStream(STREAM_FILE);
+
 </script>
 
 </body>
