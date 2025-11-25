@@ -1,155 +1,199 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Canlı Yayın</title>
+  <meta charset="UTF-8" />
+  <title>JSON Kontrollü Universal Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<style>
-    body { margin:0; background:black; overflow:hidden; }
-    #videoContainer { width:100vw; height:100vh; position:relative; background:black; }
-    video { width:100%; height:100%; object-fit:contain; background:black; }
+  <!-- Motorlar -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dashjs/dist/dash.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flv.js@latest/dist/flv.min.js"></script>
 
-    #controls {
-        position:absolute; bottom:0; left:0;
-        width:100%; height:55px;
-        background:rgba(0,0,0,0.55);
-        display:flex; align-items:center;
-        padding:0 12px;
-        opacity:0; transition:opacity .3s;
-        box-sizing: border-box;
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #000;
+      color: #f5f5f5;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
     }
-
-    #liveTag {
-        color:white; font-size:15px; display:flex; align-items:center;
-        margin-right:10px; flex-shrink:0;
+    .topbar {
+      position: absolute;
+      z-index: 2;
+      top: 0; left: 0; right: 0;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none; /* dokunmayı video’ya bırak */
     }
-    #liveTag::before {
-        content:""; width:10px; height:10px; background:red;
-        border-radius:50%; margin-right:6px; display:inline-block;
+    .title {
+      font-size: 14px;
+      font-weight: 600;
+      text-shadow: 0 0 6px #000;
     }
-
-    #progress { flex:1; margin:0 12px; min-width:0; }
-    #progress input { width:100%; display:block; }
-
-    #volumeBtn, #fsBtn {
-        font-size:28px; color:white; margin-left:10px;
-        cursor:pointer; flex-shrink:0;
+    .status {
+      font-size: 11px;
+      opacity: .8;
+      text-shadow: 0 0 5px #000;
     }
-</style>
+    #player {
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      object-fit: contain;
+    }
+  </style>
 </head>
-
 <body>
 
-<div id="videoContainer">
-    <video id="player" autoplay playsinline muted></video>
-
-    <div id="controls">
-        <div id="liveTag">LIVE</div>
-
-        <div id="progress">
-            <input type="range" id="seek" min="0" max="100" value="0">
-        </div>
-
-        <div id="volumeBtn">🔊</div>
-        <div id="fsBtn">⛶</div>
-    </div>
+<div class="topbar">
+  <div class="title" id="chTitle">Yükleniyor…</div>
+  <div class="status" id="status">JSON bekleniyor…</div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<video id="player" controls playsinline></video>
 
 <script>
-const jsonURL = "kontrol.json"; // JSON dosya adı (İstersen değiştirirsin)
+  /* --------------------------------------------------
+     JSON DOSYANIN ADRESİNİ BURAYA YAZ
+     Örnek: const JSON_URL = "https://raw.githubusercontent.com/kullanici/repo/main/live.json";
+  -------------------------------------------------- */
+  const JSON_URL = "https://example.com/live.json";
+  /* -------------------------------------------------- */
 
-let video = document.getElementById("player");
-let controls = document.getElementById("controls");
-let seek = document.getElementById("seek");
-let hideTimer;
-let hls;
-let currentStream = "";
+  const videoEl = document.getElementById("player");
+  const titleEl = document.getElementById("chTitle");
+  const statusEl = document.getElementById("status");
 
-/* OTOMATİK KONTROLLER GİZLEME */
-function showControls() {
-    controls.style.opacity = 1;
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-        controls.style.opacity = 0;
-    }, 3000);
-}
-document.body.addEventListener("mousemove", showControls);
-document.body.addEventListener("click", showControls);
+  let hls = null;
+  let dash = null;
+  let flv = null;
 
-/* YAYINI YÜKLE (SORUNSUZ MOD) */
-function loadStream(url) {
-    try {
-        if (hls) {
-            hls.stopLoad();
-            hls.destroy();
-            hls = null;
-        }
-    } catch(e){}
+  let currentUrl = null;
+  let firstPlayDone = false;
 
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+  }
 
-    if (Hls.isSupported()) {
-        hls = new Hls({
-            maxMaxBufferLength: 10,
-            lowLatencyMode: true,
-            backBufferLength: 0
-        });
+  function cleanupEngines() {
+    if (hls) { try { hls.destroy(); } catch(e) {} hls = null; }
+    if (dash) { try { dash.reset(); } catch(e) {} dash = null; }
+    if (flv) { try { flv.destroy(); } catch(e) {} flv = null; }
+    videoEl.pause();
+    videoEl.removeAttribute("src");
+    videoEl.load();
+  }
 
+  function playUniversal(url) {
+    if (!url) return;
+
+    cleanupEngines();
+
+    const lower = url.toLowerCase();
+    setStatus("Bağlanıyor…");
+
+    if (lower.endsWith(".m3u8")) {
+      if (window.Hls && Hls.isSupported()) {
+        hls = new Hls();
         hls.loadSource(url);
-        hls.attachMedia(video);
-
+        hls.attachMedia(videoEl);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            video.muted = true;
-            video.play().catch(()=>{});
+          videoEl.play().catch(()=>{});
+          setStatus("HLS (.m3u8) → Oynatılıyor");
         });
-
-    } else {
-        video.src = url;
-        video.play().catch(()=>{});
-    }
-}
-
-/* JSON KONTROL (0.7 saniyede bir) */
-function checkStream() {
-    fetch(jsonURL + "?t=" + Date.now())
-        .then(r => r.json())
-        .then(d => {
-            if (d.yayin && d.yayin !== currentStream) {
-                currentStream = d.yayin;
-                loadStream(currentStream);
-            }
+        hls.on(Hls.Events.ERROR, (e, data) => {
+          setStatus("HLS hata: " + data.details);
         });
-}
-setInterval(checkStream, 700);
-checkStream();
-
-/* SEEK */
-video.addEventListener("timeupdate", () => {
-    if (!video.duration) return;
-    seek.value = (video.currentTime / video.duration) * 100;
-});
-seek.addEventListener("input", () => {
-    video.currentTime = (seek.value / 100) * video.duration;
-});
-
-/* SES */
-document.getElementById("volumeBtn").onclick = () => {
-    video.muted = !video.muted;
-};
-
-/* TAM EKRAN */
-document.getElementById("fsBtn").onclick = () => {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        document.exitFullscreen();
+      } else {
+        videoEl.src = url;
+        videoEl.play().then(()=> setStatus("Native HLS")).catch(err => {
+          setStatus("Oynatma hatası: " + err.message);
+        });
+      }
     }
-};
+    else if (lower.endsWith(".mpd")) {
+      if (window.dashjs) {
+        dash = dashjs.MediaPlayer().create();
+        dash.initialize(videoEl, url, true);
+        setStatus("DASH (.mpd) → Oynatılıyor");
+      } else {
+        setStatus("dash.js yüklenemedi");
+      }
+    }
+    else if (lower.endsWith(".flv")) {
+      if (window.flvjs && flvjs.isSupported()) {
+        flv = flvjs.createPlayer({ type: "flv", url });
+        flv.attachMediaElement(videoEl);
+        flv.load();
+        flv.play();
+        setStatus("FLV → Oynatılıyor");
+      } else {
+        setStatus("flv.js desteklenmiyor");
+      }
+    }
+    else {
+      videoEl.src = url;
+      videoEl.play().then(() => {
+        setStatus("HTML5 video → Oynatılıyor");
+      }).catch(err => {
+        setStatus("Oynatma hatası: " + err.message);
+      });
+    }
+
+    // İlk başlatmada otomatik tam ekran
+    if (!firstPlayDone) {
+      firstPlayDone = true;
+      setTimeout(requestFullscreenSafe, 800);
+    }
+  }
+
+  function requestFullscreenSafe() {
+    // Kullanıcı etkileşimine bağlı olarak bazı tarayıcılarda engellenebilir
+    if (videoEl.requestFullscreen) videoEl.requestFullscreen();
+    else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
+    else if (videoEl.msRequestFullscreen) videoEl.msRequestFullscreen();
+  }
+
+  async function fetchConfigOnce() {
+    try {
+      const res = await fetch(JSON_URL + "?t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      const newUrl = (data.url || "").trim();
+      const newTitle = data.title || "Yayın";
+
+      titleEl.textContent = newTitle;
+
+      if (!newUrl) {
+        setStatus("JSON'da url boş");
+        return;
+      }
+
+      // URL değiştiyse kanal değiştir
+      if (newUrl !== currentUrl) {
+        currentUrl = newUrl;
+        setStatus("Kanal değişiyor…");
+        playUniversal(currentUrl);
+      } else {
+        setStatus("Yayın devam ediyor");
+      }
+    } catch (err) {
+      setStatus("JSON okunamadı: " + err.message);
+    }
+  }
+
+  // İlk yükleme
+  window.onload = () => {
+    setStatus("JSON yükleniyor…");
+    fetchConfigOnce();
+    // Her 3 saniyede bir JSON kontrol et
+    setInterval(fetchConfigOnce, 3000);
+  };
 </script>
 
 </body>
