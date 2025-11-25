@@ -2,42 +2,16 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>JSON Kontrollü Universal Player</title>
+  <title>JSON Controlled Player</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Motorlar -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dashjs/dist/dash.all.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flv.js@latest/dist/flv.min.js"></script>
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
+      margin: 0;
       background: #000;
-      color: #f5f5f5;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overflow: hidden;
-    }
-    .topbar {
-      position: absolute;
-      z-index: 2;
-      top: 0; left: 0; right: 0;
-      padding: 8px 12px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      pointer-events: none; /* dokunmayı video’ya bırak */
-    }
-    .title {
-      font-size: 14px;
-      font-weight: 600;
-      text-shadow: 0 0 6px #000;
-    }
-    .status {
-      font-size: 11px;
-      opacity: .8;
-      text-shadow: 0 0 5px #000;
     }
     #player {
       width: 100vw;
@@ -45,155 +19,89 @@
       background: #000;
       object-fit: contain;
     }
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 5;
+      color: white;
+      font-family: Arial;
+      background: rgba(0,0,0,0.5);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="title" id="chTitle">Yükleniyor…</div>
-  <div class="status" id="status">JSON bekleniyor…</div>
-</div>
-
+<div id="status">Yükleniyor…</div>
 <video id="player" controls playsinline></video>
 
 <script>
-  /* --------------------------------------------------
-     JSON DOSYANIN ADRESİNİ BURAYA YAZ
-     Örnek: const JSON_URL = "https://raw.githubusercontent.com/kullanici/repo/main/live.json";
-  -------------------------------------------------- */
-  const JSON_URL = "https://example.com/live.json";
-  /* -------------------------------------------------- */
+  // BURAYA RAW JSON LİNKİNİ YAZ
+  const JSON_URL = "https://raw.githubusercontent.com/utay88/Utay88/main/kontrol.json";
 
-  const videoEl = document.getElementById("player");
-  const titleEl = document.getElementById("chTitle");
-  const statusEl = document.getElementById("status");
+  const video = document.getElementById("player");
+  const statusBox = document.getElementById("status");
 
+  let currentChannel = null;
   let hls = null;
-  let dash = null;
-  let flv = null;
-
-  let currentUrl = null;
-  let firstPlayDone = false;
 
   function setStatus(msg) {
-    statusEl.textContent = msg;
+    statusBox.textContent = msg;
   }
 
-  function cleanupEngines() {
-    if (hls) { try { hls.destroy(); } catch(e) {} hls = null; }
-    if (dash) { try { dash.reset(); } catch(e) {} dash = null; }
-    if (flv) { try { flv.destroy(); } catch(e) {} flv = null; }
-    videoEl.pause();
-    videoEl.removeAttribute("src");
-    videoEl.load();
-  }
-
-  function playUniversal(url) {
-    if (!url) return;
-
-    cleanupEngines();
-
-    const lower = url.toLowerCase();
+  function playChannel(url) {
     setStatus("Bağlanıyor…");
 
-    if (lower.endsWith(".m3u8")) {
-      if (window.Hls && Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(videoEl);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          videoEl.play().catch(()=>{});
-          setStatus("HLS (.m3u8) → Oynatılıyor");
-        });
-        hls.on(Hls.Events.ERROR, (e, data) => {
-          setStatus("HLS hata: " + data.details);
-        });
-      } else {
-        videoEl.src = url;
-        videoEl.play().then(()=> setStatus("Native HLS")).catch(err => {
-          setStatus("Oynatma hatası: " + err.message);
-        });
-      }
+    if (hls) {
+      hls.destroy();
+      hls = null;
     }
-    else if (lower.endsWith(".mpd")) {
-      if (window.dashjs) {
-        dash = dashjs.MediaPlayer().create();
-        dash.initialize(videoEl, url, true);
-        setStatus("DASH (.mpd) → Oynatılıyor");
-      } else {
-        setStatus("dash.js yüklenemedi");
-      }
-    }
-    else if (lower.endsWith(".flv")) {
-      if (window.flvjs && flvjs.isSupported()) {
-        flv = flvjs.createPlayer({ type: "flv", url });
-        flv.attachMediaElement(videoEl);
-        flv.load();
-        flv.play();
-        setStatus("FLV → Oynatılıyor");
-      } else {
-        setStatus("flv.js desteklenmiyor");
-      }
-    }
-    else {
-      videoEl.src = url;
-      videoEl.play().then(() => {
-        setStatus("HTML5 video → Oynatılıyor");
-      }).catch(err => {
-        setStatus("Oynatma hatası: " + err.message);
+
+    if (Hls.isSupported()) {
+      hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(()=>{});
+        setStatus("Oynatılıyor");
       });
-    }
-
-    // İlk başlatmada otomatik tam ekran
-    if (!firstPlayDone) {
-      firstPlayDone = true;
-      setTimeout(requestFullscreenSafe, 800);
+    } else {
+      video.src = url;
+      video.play().catch(err => setStatus(err.message));
+      setStatus("Native HLS oynatılıyor");
     }
   }
 
-  function requestFullscreenSafe() {
-    // Kullanıcı etkileşimine bağlı olarak bazı tarayıcılarda engellenebilir
-    if (videoEl.requestFullscreen) videoEl.requestFullscreen();
-    else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
-    else if (videoEl.msRequestFullscreen) videoEl.msRequestFullscreen();
-  }
-
-  async function fetchConfigOnce() {
+  async function fetchJSON() {
     try {
-      const res = await fetch(JSON_URL + "?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      const res = await fetch(JSON_URL + "?t=" + Date.now());
       const data = await res.json();
 
-      const newUrl = (data.url || "").trim();
-      const newTitle = data.title || "Yayın";
-
-      titleEl.textContent = newTitle;
+      const newUrl = data.channel;
 
       if (!newUrl) {
-        setStatus("JSON'da url boş");
+        setStatus("JSON 'channel' bulunamadı!");
         return;
       }
 
-      // URL değiştiyse kanal değiştir
-      if (newUrl !== currentUrl) {
-        currentUrl = newUrl;
-        setStatus("Kanal değişiyor…");
-        playUniversal(currentUrl);
-      } else {
-        setStatus("Yayın devam ediyor");
+      if (newUrl !== currentChannel) {
+        currentChannel = newUrl;
+        setStatus("Kanal değişti, yeni yayın yükleniyor…");
+        playChannel(newUrl);
       }
-    } catch (err) {
-      setStatus("JSON okunamadı: " + err.message);
+
+    } catch (e) {
+      setStatus("JSON okunamadı: " + e.message);
     }
   }
 
   // İlk yükleme
-  window.onload = () => {
-    setStatus("JSON yükleniyor…");
-    fetchConfigOnce();
-    // Her 3 saniyede bir JSON kontrol et
-    setInterval(fetchConfigOnce, 3000);
-  };
+  fetchJSON();
+  // 3 saniyede bir JSON kontrolü
+  setInterval(fetchJSON, 3000);
 </script>
 
 </body>
