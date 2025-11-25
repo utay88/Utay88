@@ -3,109 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VivoX Premium Player</title>
+<title>Clappr AutoFit Player</title>
 
 <style>
     html, body {
         margin: 0;
         padding: 0;
+        width: 100%;
         height: 100%;
         background: #000;
         overflow: hidden;
     }
 
-    #player-container {
-        position: fixed;
-        inset: 0;
-        background: #000;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-
-    video {
+    #player {
         width: 100%;
         height: 100%;
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;        /* TAŞMA / ÇARPILMA / ZOOM YOK */
+        position: fixed;
+        top: 0;
+        left: 0;
         background: #000;
     }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<!-- Clappr Player -->
+<script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+
 </head>
 <body>
 
-<div id="player-container">
-    <video id="video" controls autoplay playsinline webkit-playsinline></video>
-</div>
+<div id="player"></div>
 
 <script>
-/* YAYINI DIŞARIDAN OKUYAN DOSYA */
+/* Yayını GitHub’dan okuyan sistem */
 const PLAYLIST_URL = "https://utay88.github.io/Utay88/live/trt1.m3u8";
 
-/* VIDEO ELEMENTİ */
-const video = document.getElementById("video");
-
-/* M3U8 DOSYASINI OKU */
+/* M3U8 linkini dış dosyadan al */
 async function getStreamURL() {
     try {
         const res = await fetch(PLAYLIST_URL + "?t=" + Date.now());
-        const text = await res.text();
-        return text.trim();
+        return (await res.text()).trim();
     } catch (e) {
         console.log("Yayın alınamadı:", e);
         return null;
     }
 }
 
-/* PLAYER BAŞLAT */
-async function startPlayer() {
-    const streamURL = await getStreamURL();
-    if (!streamURL) {
+async function start() {
+    const stream = await getStreamURL();
+    if (!stream) {
         alert("Yayın bulunamadı.");
         return;
     }
 
-    console.log("Açılan yayın:", streamURL);
-
-    if (Hls.isSupported()) {
-        const hls = new Hls({
-            maxBufferLength: 10,
-            maxMaxBufferLength: 60,
-            enableWorker: true,
-            lowLatencyMode: true
-        });
-
-        hls.loadSource(streamURL);
-        hls.attachMedia(video);
-
-        /* EN YÜKSEK KALİTEYE SABİTLE */
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            const maxLevel = hls.levels.length - 1;
-            hls.currentLevel = maxLevel;   // EN İYİ KALİTE
-            video.play();
-        });
-
-        /* HATA KORUMASI */
-        hls.on(Hls.Events.ERROR, function (event, data) {
-            if (data.fatal) {
-                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                    hls.startLoad();
-                } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                    hls.recoverMediaError();
-                }
+    /* CLAPPR PLAYER AYARLARI */
+    var player = new Clappr.Player({
+        source: stream,
+        parentId: "#player",
+        autoPlay: true,
+        mute: false,
+        height: "100%",
+        width: "100%",
+        playback: {
+            hlsjsConfig: {
+                maxMaxBufferLength: 60,
             }
-        });
-
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = streamURL;
-        video.play();
-    }
+        }
+    });
 }
 
-startPlayer();
+start();
 </script>
 
 </body>
