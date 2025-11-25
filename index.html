@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Smart Player</title>
+<title>Perfect Player</title>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
@@ -12,33 +11,36 @@
 html, body {
     margin: 0;
     padding: 0;
-    background: #000;
     height: 100%;
+    background: #000;
     overflow: hidden;
 }
+
 #v {
     width: 100%;
     height: 100%;
     object-fit: contain;
     background: #000;
-    pointer-events: none; /* dokununca durmayı yok eder */
+    pointer-events: none; /* ekrana dokununca durmasın */
 }
 </style>
 </head>
+
 <body>
 
 <video id="v" autoplay playsinline></video>
 
 <script>
-// GITHUB’dan yayın oku (HER SEFERİNDE YENİSİ)
-const LINK = "https://utay88.github.io/Utay88/live/trt1.m3u8?t=" + Date.now();
+// CANLI YAYIN → CACHE KAPALI
+const LINK = "https://utay88.github.io/Utay88/live/trt1.m3u8?nocache=" + Math.random();
 
 const video = document.getElementById("v");
 
-// TIKLAYINCA DURMAYI tamamen yok et
+// tıklayınca durmayı ZORLA engelle
 video.addEventListener("pause", () => video.play());
+video.addEventListener("click", e => e.preventDefault());
 
-// HLS yükle
+// HLS MOTORU
 if (Hls.isSupported()) {
     const hls = new Hls({
         maxBufferLength: 10,
@@ -50,8 +52,9 @@ if (Hls.isSupported()) {
     hls.attachMedia(video);
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        let max = hls.levels.length - 1;
-        hls.currentLevel = max; // en yüksek kalite
+        // EN YÜKSEK KALİTE SABİTLE
+        const max = hls.levels.length - 1;
+        hls.currentLevel = max;
         video.play();
     });
 
