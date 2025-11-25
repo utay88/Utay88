@@ -3,72 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clappr AutoFit Player</title>
+<title>Plyr Smart Player</title>
+
+<!-- PLYR CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
 
 <style>
     html, body {
         margin: 0;
         padding: 0;
-        width: 100%;
         height: 100%;
         background: #000;
         overflow: hidden;
     }
 
-    #player {
+    #player-wrapper {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    video {
         width: 100%;
         height: 100%;
-        position: fixed;
-        top: 0;
-        left: 0;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain; /* kesinlikle taşma olmaz */
         background: #000;
     }
 </style>
-
-<!-- Clappr Player -->
-<script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
-
 </head>
 <body>
 
-<div id="player"></div>
+<div id="player-wrapper">
+    <video id="player" controls playsinline></video>
+</div>
+
+<!-- PLYR JS -->
+<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.min.js"></script>
 
 <script>
-/* Yayını GitHub’dan okuyan sistem */
+/* Yayın dışarıdan okunuyor */
 const PLAYLIST_URL = "https://utay88.github.io/Utay88/live/trt1.m3u8";
 
-/* M3U8 linkini dış dosyadan al */
-async function getStreamURL() {
+async function getURL() {
     try {
         const res = await fetch(PLAYLIST_URL + "?t=" + Date.now());
         return (await res.text()).trim();
-    } catch (e) {
-        console.log("Yayın alınamadı:", e);
+    } catch {
         return null;
     }
 }
 
 async function start() {
-    const stream = await getStreamURL();
-    if (!stream) {
-        alert("Yayın bulunamadı.");
-        return;
-    }
+    const stream = await getURL();
+    if (!stream) return alert("Yayın bulunamadı");
 
-    /* CLAPPR PLAYER AYARLARI */
-    var player = new Clappr.Player({
-        source: stream,
-        parentId: "#player",
-        autoPlay: true,
-        mute: false,
-        height: "100%",
-        width: "100%",
-        playback: {
-            hlsjsConfig: {
-                maxMaxBufferLength: 60,
-            }
+    const video = document.getElementById("player");
+
+    // Eğer tarayıcı native HLS destekliyorsa direkt açar
+    video.src = stream;
+
+    // PLYR initialize
+    const player = new Plyr('#player', {
+        autoplay: true,
+        muted: false,
+        ratio: "16:9",
+        quality: {
+            default: 1080,
+            forced: true
         }
     });
+
+    video.play().catch(()=>{});
 }
 
 start();
