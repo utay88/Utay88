@@ -1,79 +1,167 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Full HD Player</title>
+  <meta charset="UTF-8">
+  <title>Maç Saatinde Aktif</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<!-- Plyr CSS -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3/dist/plyr.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-<style>
     body {
-        margin: 0;
-        background: #000;
-        overflow: hidden;
+      font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+      background: radial-gradient(circle at center, #141414 0%, #07080c 70%, #000 100%);
+      color: #e8e8e8;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: subtleFade 2s ease-in-out;
     }
 
-    video {
-        width: 100vw;
-        height: 100vh;
-        object-fit: contain;   /* HER CİHAZDA DOĞRU ORAN */
-        background: #000;
+    @keyframes subtleFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
-</style>
+
+    .wrapper {
+      text-align: center;
+      padding: 24px;
+      max-width: 90%;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px;
+      border-radius: 50px;
+      background: rgba(0, 255, 170, 0.10);
+      border: 1px solid rgba(0, 255, 170, 0.55);
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #aaffea;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 0 12px rgba(0,255,170,0.25);
+      margin-bottom: 18px;
+      animation: badgeGlow 3s ease-in-out infinite;
+    }
+
+    .badge-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #00ff95;
+      box-shadow: 0 0 12px #00ff95;
+      animation: dotPulse 1.8s infinite;
+    }
+
+    @keyframes dotPulse {
+      0%,100% { transform: scale(1); }
+      50% { transform: scale(1.4); }
+    }
+
+    @keyframes badgeGlow {
+      0%, 100% { box-shadow: 0 0 10px rgba(0,255,170,0.3); }
+      50% { box-shadow: 0 0 22px rgba(0,255,170,0.7); }
+    }
+
+    h1 {
+      font-size: 30px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      animation: titlePulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes titlePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.015); }
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: #b8b8b8;
+      margin-bottom: 32px;
+      letter-spacing: 0.01em;
+    }
+
+    .sports-row {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      font-size: 38px;
+      margin-bottom: 28px;
+    }
+
+    .ball {
+      opacity: 0.95;
+      filter: drop-shadow(0 0 10px rgba(0,255,180,0.35));
+    }
+
+    .ball--1 { animation: float1 4.2s ease-in-out infinite; }
+    .ball--2 { animation: float2 5s ease-in-out infinite; }
+    .ball--3 { animation: float3 4.6s ease-in-out infinite; }
+
+    @keyframes float1 {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    @keyframes float2 {
+      0%,100% { transform: translateY(4px); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @keyframes float3 {
+      0%,100% { transform: translateY(-3px); }
+      50% { transform: translateY(10px); }
+    }
+
+    .info {
+      font-size: 13px;
+      color: #8a8f9d;
+      line-height: 1.5;
+      max-width: 85%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 480px) {
+      h1 { font-size: 24px; }
+      .sports-row { font-size: 30px; gap: 20px; }
+    }
+
+  </style>
+
 </head>
 <body>
 
-<video id="player" playsinline controls></video>
+  <div class="wrapper">
+    <div class="badge">
+      <div class="badge-dot"></div>
+      MAÇ SAATİNDE AKTİF
+    </div>
 
-<!-- HLS.js -->
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<!-- Plyr JS -->
-<script src="https://cdn.jsdelivr.net/npm/plyr@3/dist/plyr.polyfilled.js"></script>
+    <h1>Canlı Yayın Henüz Başlamadı</h1>
 
-<script>
-    const streamUrl = "live/trt1.m3u8?t=" + Date.now(); 
-    const video = document.getElementById("player");
+    <p class="subtitle">
+      Maç saati geldiğinde bu kanal otomatik olarak canlı yayına geçecektir.
+    </p>
 
-    // Plyr başlat
-    const player = new Plyr(video, {
-        clickToPlay: false,    // EKRANA TIKLAYINCA DURMA ❗
-        keyboard: { focused: true, global: true },
-        autoplay: true
-    });
+    <div class="sports-row">
+      <span class="ball ball--1">⚽</span>
+      <span class="ball ball--2">🏀</span>
+      <span class="ball ball--3">🎾</span>
+    </div>
 
-    if (Hls.isSupported()) {
-        const hls = new Hls({
-            maxBufferLength: 30,
-            enableWorker: true
-        });
-
-        hls.loadSource(streamUrl);
-        hls.attachMedia(video);
-
-        // *** EN YÜKSEK KALİTEYİ SEÇ ***
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            let max = hls.levels.length - 1;
-            hls.currentLevel = max;  // **HER ZAMAN EN YÜKSEK KALİTE**
-            video.play();
-        });
-
-        // *** Hata olursa toparla ***
-        hls.on(Hls.Events.ERROR, function (event, data) {
-            if (data.fatal) {
-                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                    hls.startLoad();
-                } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                    hls.recoverMediaError();
-                }
-            }
-        });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = streamUrl;
-        video.play();
-    }
-</script>
+    <p class="info">
+      Yayın sağlayıcı akışını aktif hale getirdiğinde bu ekran otomatik olarak güncellenecektir.
+      Lütfen maç saatine yakın tekrar kontrol edin.
+    </p>
+  </div>
 
 </body>
 </html>
